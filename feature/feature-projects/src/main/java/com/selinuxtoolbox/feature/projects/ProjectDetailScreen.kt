@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,7 +39,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -72,7 +70,6 @@ fun ProjectDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Find this project from the list
     val project = uiState.projects.firstOrNull { it.id == projectId }
 
     LaunchedEffect(project) {
@@ -95,10 +92,7 @@ fun ProjectDetailScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        project?.name ?: "Project Detail",
-                        maxLines = 1
-                    )
+                    Text(project?.name ?: "Project Detail", maxLines = 1)
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
@@ -106,7 +100,7 @@ fun ProjectDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.exportProject(projectId) }) {
+                    IconButton(onClick = { viewModel.onExportProject(projectId) }) {
                         Icon(Icons.Default.IosShare, contentDescription = "Export")
                     }
                 }
@@ -116,25 +110,19 @@ fun ProjectDetailScreen(
     ) { padding ->
         if (project == null || detailState.isLoading) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
+                modifier = Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center
             ) { CircularProgressIndicator() }
             return@Scaffold
         }
 
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
+            modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Project summary card
             item { ProjectSummaryCard(project = project) }
 
-            // Action validation section (post factory-reset restore)
             item {
                 ActionValidationSection(
                     validations = detailState.validations,
@@ -143,7 +131,6 @@ fun ProjectDetailScreen(
                 )
             }
 
-            // Action log header
             item {
                 Text(
                     "Action Log",
@@ -186,7 +173,6 @@ private fun ProjectSummaryCard(project: Project) {
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(modifier = Modifier.height(12.dp))
-
             DetailRow("Source", "${project.sourceDevice} (${project.sourceRom})")
             DetailRow("Target", "${project.targetDevice} (${project.targetRom})")
             DetailRow("Folder", project.projectFolderPath)
@@ -199,9 +185,7 @@ private fun ProjectSummaryCard(project: Project) {
 @Composable
 private fun DetailRow(label: String, value: String) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp)
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
     ) {
         Text(
             text = "$label: ",
@@ -245,18 +229,15 @@ private fun ActionValidationSection(
                     }
                 }
             }
-
             Text(
                 "After factory reset + reimport: check which actions still need to be applied",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-
             if (validations.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
-
                 validations.forEach { validation ->
                     ValidationRow(validation = validation)
                 }
@@ -269,15 +250,12 @@ private fun ActionValidationSection(
 private fun ValidationRow(validation: ActionValidation) {
     val (icon, color) = when (validation.validity) {
         ActionValidity.ALREADY_APPLIED -> Icons.Default.CheckCircle to EnforcingGreen
-        ActionValidity.NEEDS_REAPPLY -> Icons.Default.Refresh to ReviewBlue
+        ActionValidity.NEEDS_REAPPLY   -> Icons.Default.Refresh to ReviewBlue
         ActionValidity.PARTIALLY_APPLICABLE -> Icons.Default.Warning to WarningYellow
-        ActionValidity.NOT_APPLICABLE -> Icons.Default.Error to CriticalRed
+        ActionValidity.NOT_APPLICABLE  -> Icons.Default.Error to CriticalRed
     }
-
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Top
     ) {
@@ -305,16 +283,15 @@ private fun ValidationRow(validation: ActionValidation) {
 @Composable
 private fun ActionLogCard(action: ActionRecord) {
     val typeColor = when (action.type) {
-        ActionType.CLEANUP_PASS -> EnforcingGreen
+        ActionType.CLEANUP_PASS    -> EnforcingGreen
         ActionType.DENIAL_RULE_ADD -> ReviewBlue
-        ActionType.SECLABEL_FIX -> WarningYellow
+        ActionType.SECLABEL_FIX   -> WarningYellow
         ActionType.CONFLICT_RESOLVE -> CriticalRed
-        ActionType.COMPILE -> MaterialTheme.colorScheme.primary
-        ActionType.CONTEXT_UPDATE -> OrphanedGrey
-        ActionType.MANUAL_EDIT -> OrphanedGrey
-        ActionType.RESTORE -> ReviewBlue
+        ActionType.COMPILE         -> MaterialTheme.colorScheme.primary
+        ActionType.CONTEXT_UPDATE  -> OrphanedGrey
+        ActionType.MANUAL_EDIT     -> OrphanedGrey
+        ActionType.RESTORE         -> ReviewBlue
     }
-
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -360,7 +337,5 @@ private fun ActionLogCard(action: ActionRecord) {
     }
 }
 
-private fun formatDate(timestamp: Long): String {
-    val sdf = SimpleDateFormat("MMM dd HH:mm", Locale.getDefault())
-    return sdf.format(Date(timestamp))
-}
+private fun formatDate(timestamp: Long): String =
+    SimpleDateFormat("MMM dd HH:mm", Locale.getDefault()).format(Date(timestamp))
