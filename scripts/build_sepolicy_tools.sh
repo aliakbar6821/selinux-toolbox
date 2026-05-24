@@ -28,6 +28,7 @@ SELINUX_SRC="$BUILD_DIR/selinux"
 SEPOLICY_SRC="$BUILD_DIR/system_sepolicy"
 OBJ_DIR="$BUILD_DIR/obj"
 LIB_DIR="$BUILD_DIR/lib"
+GEN_DIR="$BUILD_DIR/generated"
 
 # ---------------------------------------------------------------------------
 # Colors
@@ -105,8 +106,7 @@ inspect_source() {
         -exec basename {} \; 2>/dev/null | tr '\n' ' '; echo
 
     log_debug "libsepol/cil/src files:"
-    find "$SELINUX_SRC/libsepol/cil/src" -name "*.c" \
-        -not -path "*/test*" \
+    find "$SELINUX_SRC/libsepol/cil/src" -maxdepth 1 \
         -exec basename {} \; 2>/dev/null | tr '\n' ' '; echo
 
     log_debug "secilc:"
@@ -126,7 +126,6 @@ setup_toolchain() {
 
     if [ ! -f "${TOOLCHAIN}/bin/${TARGET}-clang" ]; then
         log_error "Clang not found: ${TOOLCHAIN}/bin/${TARGET}-clang"
-        ls "${TOOLCHAIN}/bin/"*clang* 2>/dev/null | head -5 || true
         exit 1
     fi
 
@@ -149,6 +148,7 @@ detect_includes() {
         "$SELINUX_SRC/libsepol/src" \
         "$SELINUX_SRC/libsepol/cil/include" \
         "$SELINUX_SRC/libsepol/cil/src" \
+        "$GEN_DIR" \
         "$SELINUX_SRC/libselinux/include"
     do
         if [ -d "$d" ]; then
@@ -158,22 +158,6 @@ detect_includes() {
 
     export INCLUDE_FLAGS="$flags"
 
-    # KEY FIX: -DHAVE_REALLOCARRAY
-    #
-    # libsepol/src/private.h defines reallocarray() as a static inline
-    # fallback for systems that lack it. Android NDK API 29+ already provides
-    # reallocarray() in bionic's malloc.h. When compiling with API 35,
-    # the NDK sysroot declares it as extern, which conflicts with the static
-    # inline definition in private.h.
-    #
-    # Setting HAVE_REALLOCARRAY tells private.h to skip its own definition
-    # and use the one already provided by the sysroot.
-    #
-    # Other defines:
-    #   ANDROID             — enables Android-specific code paths in libsepol
-    #   DISABLE_SETRANS     — disables setransd (not present on Android)
-    #   DISABLE_BOOL        — disables boolean support (not used in Android CIL)
-    #   _GNU_SOURCE         — enables GNU extensions needed by libsepol
     export BASE_CFLAGS="\
         -O2 \
         -fPIE \
@@ -190,9 +174,10 @@ detect_includes() {
         -Wno-implicit-function-declaration \
         $INCLUDE_FLAGS"
 
-    export LDFLAGS="-static -pie"
+    # No -pie in LDFLAGS for static executables with lld
+    # -static already implies position-independent for our purposes
+    export LDFLAGS="-static"
 
-    log_info "HAVE_REALLOCARRAY defined — skips private.h static inline"
     log_info "Includes: $INCLUDE_FLAGS"
 }
 
@@ -214,7 +199,50 @@ compile_file() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 6: Build libsepol (production files only — no tests, no fuzz)
+# Step 6: Generate CIL lexer from flex source
+#
+# WHY: cil_lexer.l is a flex grammar file. The .c output (cil_lexer.l.c)
+# is NOT in the git repo — it must be generated at build time using flex.
+# The symbols cil_lexer_setup / cil_lexer_next / cil_lexer_destroy are
+# defined in the generated file. Without generating it, the link fails.
+# ---------------------------------------------------------------------------
+generate_cil_lexer() {
+    log_info "Generating CIL lexer from cil_lexer.l (flex)..."
+
+    local LEX_SRC="$SELINUX_SRC/libsepol/cil/src/cil_lexer.l"
+    local LEX_OUT="$GEN_DIR/cil_lexer.l.c"
+
+    mkdir -p "$GEN_DIR"
+
+    if [ ! -f "$LEX_SRC" ]; then
+        log_error "cil_lexer.l not found at $LEX_SRC"
+        log_error "cil/src contents:"
+        ls "$SELINUX_SRC/libsepol/cil/src/" || true
+        exit 1
+    fi
+
+    log_info "flex input: $LEX_SRC"
+
+    # flex generates the lexer C file
+    # --nounistd: avoid unistd.h issues on some cross-compile environments
+    # -o: output file path
+    if ! flex --nounistd -o "$LEX_OUT" "$LEX_SRC" 2>&1; then
+        log_error "flex failed to generate cil_lexer.l.c"
+        exit 1
+    fi
+
+    if [ ! -f "$LEX_OUT" ]; then
+        log_error "flex ran but $LEX_OUT was not created"
+        exit 1
+    fi
+
+    local size
+    size=$(wc -l < "$LEX_OUT")
+    log_info "Generated cil_lexer.l.c ($size lines)"
+}
+
+# ---------------------------------------------------------------------------
+# Step 7: Build libsepol
 # ---------------------------------------------------------------------------
 build_libsepol() {
     log_info "Building libsepol..."
@@ -222,11 +250,8 @@ build_libsepol() {
     local LIBSEPOL_SRC="$SELINUX_SRC/libsepol"
     mkdir -p "$OBJ_DIR/libsepol" "$LIB_DIR"
 
-    # Collect ONLY production source files from:
-    #   libsepol/src/       — core policy library
-    #   libsepol/cil/src/   — CIL compiler
-    # Exclude:
-    #   */test*  */fuzz*    — test and fuzzing code
+    # Collect production .c files from libsepol/src/ and libsepol/cil/src/
+    # Exclude test and fuzz directories
     local all_c_files=()
     while IFS= read -r -d '' f; do
         all_c_files+=("$f")
@@ -234,32 +259,40 @@ build_libsepol() {
         find \
             "$LIBSEPOL_SRC/src" \
             "$LIBSEPOL_SRC/cil/src" \
+            -maxdepth 1 \
             -name "*.c" \
-            -not -path "*/test*" \
-            -not -path "*/fuzz*" \
+            -not -name "*test*" \
+            -not -name "*fuzz*" \
             -print0 2>/dev/null | sort -z
     )
 
-    log_info "Production source files: ${#all_c_files[@]}"
-
-    if [ ${#all_c_files[@]} -eq 0 ]; then
-        log_error "No source files found in libsepol/src or libsepol/cil/src"
+    # Add the generated lexer — it is in GEN_DIR, not in the source tree
+    local LEX_OUT="$GEN_DIR/cil_lexer.l.c"
+    if [ -f "$LEX_OUT" ]; then
+        all_c_files+=("$LEX_OUT")
+        log_info "Added generated lexer: cil_lexer.l.c"
+    else
+        log_error "Generated lexer not found at $LEX_OUT — was generate_cil_lexer() called?"
         exit 1
     fi
+
+    log_info "Total source files (including generated): ${#all_c_files[@]}"
 
     local ok=0 failed=0
     local obj_files=()
     local first_failed_src=""
 
     for src in "${all_c_files[@]}"; do
-        local rel="${src#$LIBSEPOL_SRC/}"
-        local obj="$OBJ_DIR/libsepol/$(echo "$rel" | tr '/' '_').o"
+        # Build object path: strip any leading path prefix, sanitize separators
+        local basename
+        basename=$(basename "$src")
+        local obj="$OBJ_DIR/libsepol/${basename}.o"
 
         if compile_file "$src" "$obj"; then
             obj_files+=("$obj")
             ok=$((ok + 1))
         else
-            log_warn "Failed: $(basename "$src")"
+            log_warn "Failed: $basename"
             [ -z "$first_failed_src" ] && first_failed_src="$src"
             failed=$((failed + 1))
         fi
@@ -269,15 +302,15 @@ build_libsepol() {
 
     if [ ${#obj_files[@]} -eq 0 ]; then
         log_error "Zero object files produced"
-        log_error "First compiler error:"
         $CC $BASE_CFLAGS -c "${all_c_files[0]}" -o /dev/null 2>&1 || true
         exit 1
     fi
 
-    # Fail only if >20% of production files failed
+    # Allow a small number of failures (e.g. platform-specific files)
+    # but fail if more than 10% fail
     local total=${#all_c_files[@]}
-    if [ $total -gt 0 ] && [ $((failed * 100 / total)) -gt 20 ]; then
-        log_error "Over 20% of production files failed ($failed/$total)"
+    if [ $total -gt 0 ] && [ $((failed * 100 / total)) -gt 10 ]; then
+        log_error "Over 10% of files failed ($failed/$total)"
         if [ -n "$first_failed_src" ]; then
             log_error "First failure — full compiler output:"
             $CC $BASE_CFLAGS -c "$first_failed_src" -o /dev/null 2>&1 || true
@@ -294,7 +327,7 @@ build_libsepol() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 7: Build secilc
+# Step 8: Build secilc
 # ---------------------------------------------------------------------------
 build_secilc() {
     log_info "Building secilc..."
@@ -313,7 +346,7 @@ build_secilc() {
 
     log_info "Compiling secilc.c..."
     if ! $CC $BASE_CFLAGS -c "$main_src" -o "$main_obj" 2>&1; then
-        log_error "secilc.c failed to compile"
+        log_error "secilc.c failed to compile — full error:"
         $CC $BASE_CFLAGS -c "$main_src" -o /dev/null 2>&1 || true
         exit 1
     fi
@@ -338,13 +371,13 @@ build_secilc() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 8: Build sepolicy-analyze
+# Step 9: Build sepolicy-analyze
 # ---------------------------------------------------------------------------
 build_sepolicy_analyze() {
     log_info "Building sepolicy-analyze..."
 
-    # Android 12+: lives in system/sepolicy/tools/sepolicy-analyze/
-    # Older AOSP:  lives in external/selinux/sepolicy-analyze/
+    # Android 12+: system/sepolicy/tools/sepolicy-analyze/
+    # Older AOSP:  external/selinux/sepolicy-analyze/
     local SA_DIR=""
 
     for candidate in \
@@ -353,7 +386,7 @@ build_sepolicy_analyze() {
         "$SELINUX_SRC/tools/sepolicy-analyze"
     do
         if [ -d "$candidate" ] && \
-           find "$candidate" -name "*.c" -quit 2>/dev/null | grep -q .; then
+           find "$candidate" -maxdepth 1 -name "*.c" -quit 2>/dev/null | grep -q .; then
             SA_DIR="$candidate"
             log_info "sepolicy-analyze source: $SA_DIR"
             break
@@ -377,21 +410,21 @@ build_sepolicy_analyze() {
         log_error "Cannot find sepolicy-analyze source"
         log_error "system/sepolicy/tools contents:"
         ls "$SEPOLICY_SRC/tools/" 2>/dev/null || true
-        log_error "Searching for *analyze*.c files:"
+        log_error "Searching for *analyze*.c:"
         find "$SEPOLICY_SRC" "$SELINUX_SRC" \
             -name "*analyze*.c" 2>/dev/null | head -10 || true
         exit 1
     fi
 
     log_debug "sepolicy-analyze files:"
-    find "$SA_DIR" -name "*.c" -not -path "*/test*" \
+    find "$SA_DIR" -maxdepth 1 -name "*.c" \
         -exec basename {} \; 2>/dev/null | tr '\n' ' '; echo
 
     local c_files=()
     while IFS= read -r -d '' f; do
         c_files+=("$f")
-    done < <(find "$SA_DIR" -name "*.c" \
-        -not -path "*/test*" \
+    done < <(find "$SA_DIR" -maxdepth 1 -name "*.c" \
+        -not -name "*test*" \
         -print0 2>/dev/null)
 
     if [ ${#c_files[@]} -eq 0 ]; then
@@ -401,17 +434,24 @@ build_sepolicy_analyze() {
 
     log_info "sepolicy-analyze: ${#c_files[@]} source files"
 
+    # sepolicy-analyze also needs libsepol includes
+    local SA_EXTRA_INCLUDES=""
+    if [ -d "$SEPOLICY_SRC/tools/sepolicy-analyze" ]; then
+        SA_EXTRA_INCLUDES="-I$SEPOLICY_SRC/tools/sepolicy-analyze"
+    fi
+
     mkdir -p "$OBJ_DIR/sepolicy_analyze"
     local obj_files=()
     local failed=0
 
     for src in "${c_files[@]}"; do
         local obj="$OBJ_DIR/sepolicy_analyze/$(basename "$src").o"
-        if compile_file "$src" "$obj"; then
+        mkdir -p "$(dirname "$obj")"
+        if $CC $BASE_CFLAGS $SA_EXTRA_INCLUDES -c "$src" -o "$obj" 2>/tmp/ce; then
             obj_files+=("$obj")
         else
             log_warn "Failed: $(basename "$src")"
-            $CC $BASE_CFLAGS -c "$src" -o /dev/null 2>&1 | head -15 || true
+            cat /tmp/ce | head -20 || true
             failed=$((failed + 1))
         fi
     done
@@ -421,7 +461,7 @@ build_sepolicy_analyze() {
         exit 1
     fi
 
-    log_info "Linking sepolicy-analyze..."
+    log_info "Linking sepolicy-analyze ($((${#obj_files[@]})) objects)..."
     if ! $CC \
         "${obj_files[@]}" \
         "$LIB_DIR/libsepol.a" \
@@ -441,7 +481,7 @@ build_sepolicy_analyze() {
 }
 
 # ---------------------------------------------------------------------------
-# Step 9: Verify
+# Step 10: Verify
 # ---------------------------------------------------------------------------
 verify_binaries() {
     log_info "=== Verification ==="
@@ -462,7 +502,7 @@ verify_binaries() {
         if echo "$info" | grep -qE "aarch64|ARM aarch64|ELF 64-bit.*ARM"; then
             log_info "OK: $binary ($size) — aarch64 ELF"
         else
-            log_error "FAIL: $binary — unexpected type: $info"
+            log_error "FAIL: $binary — $info"
             all_ok=false
         fi
     done
@@ -486,13 +526,14 @@ main() {
     log_info "Output:    $OUTPUT_DIR"
     log_info "==========================================="
 
-    mkdir -p "$OUTPUT_DIR" "$BUILD_DIR" "$OBJ_DIR" "$LIB_DIR"
+    mkdir -p "$OUTPUT_DIR" "$BUILD_DIR" "$OBJ_DIR" "$LIB_DIR" "$GEN_DIR"
 
     install_ndk
     clone_sources
     inspect_source
     setup_toolchain
     detect_includes
+    generate_cil_lexer   # Must run BEFORE build_libsepol
     build_libsepol
     build_secilc
     build_sepolicy_analyze

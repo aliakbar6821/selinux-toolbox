@@ -35,7 +35,7 @@ jobs:
       - name: Generate cache key
         id: cache-key
         run: |
-          KEY="sepolicy-tools-${{ env.AOSP_SELINUX_TAG }}-ndk-${{ env.NDK_VERSION }}-v6"
+          KEY="sepolicy-tools-${{ env.AOSP_SELINUX_TAG }}-ndk-${{ env.NDK_VERSION }}-v7"
           echo "key=$KEY" >> "$GITHUB_OUTPUT"
           echo "Cache key: $KEY"
 
