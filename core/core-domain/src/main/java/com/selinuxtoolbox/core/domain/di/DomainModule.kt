@@ -6,6 +6,7 @@ import com.selinuxtoolbox.core.data.db.ProjectDao
 import com.selinuxtoolbox.core.data.prefs.AppPreferences
 import com.selinuxtoolbox.core.data.root.RootFileReader
 import com.selinuxtoolbox.core.data.root.RootShell
+import com.selinuxtoolbox.core.domain.parser.AvcDenialParser
 import com.selinuxtoolbox.core.domain.repository.ActionRepository
 import com.selinuxtoolbox.core.domain.repository.BackupOrchestrator
 import com.selinuxtoolbox.core.domain.repository.PolicyRepository
@@ -19,6 +20,10 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DomainModule {
+
+    @Provides
+    @Singleton
+    fun provideAvcDenialParser(): AvcDenialParser = AvcDenialParser()
 
     @Provides
     @Singleton
@@ -41,8 +46,6 @@ object DomainModule {
         actionRepository: ActionRepository
     ): BackupOrchestrator = BackupOrchestrator(actionRepository)
 
-    // SetActiveProjectUseCase needs both ActionRepository and AppPreferences
-    // so we provide it explicitly here
     @Provides
     @Singleton
     fun provideSetActiveProjectUseCase(
