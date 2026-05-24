@@ -2,18 +2,16 @@ package com.selinuxtoolbox.core.domain.usecase
 
 import com.selinuxtoolbox.core.domain.repository.ActionRepository
 import com.selinuxtoolbox.core.domain.repository.BackupOrchestrator
-import javax.inject.Inject
 import java.io.File
+import javax.inject.Inject
 
 class ExportProjectUseCase @Inject constructor(
     private val actionRepository: ActionRepository,
     private val backupOrchestrator: BackupOrchestrator
 ) {
-    // Export a project to a portable zip in /sdcard/SELinuxToolbox/exports/
-    // The zip contains the full project folder structure + action log
     suspend operator fun invoke(
         projectId: Long,
-        exportsDir: String   // e.g. /sdcard/SELinuxToolbox/exports
+        exportsDir: String
     ): Result<String> = runCatching {
         val project = actionRepository.getProjectById(projectId)
             ?: error("Project $projectId not found")
