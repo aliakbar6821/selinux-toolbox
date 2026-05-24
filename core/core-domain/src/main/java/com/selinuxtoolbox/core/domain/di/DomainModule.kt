@@ -6,10 +6,12 @@ import com.selinuxtoolbox.core.data.db.ProjectDao
 import com.selinuxtoolbox.core.data.prefs.AppPreferences
 import com.selinuxtoolbox.core.data.root.RootFileReader
 import com.selinuxtoolbox.core.data.root.RootShell
+import com.selinuxtoolbox.core.domain.analyzer.CleanupEngine
 import com.selinuxtoolbox.core.domain.parser.AvcDenialParser
 import com.selinuxtoolbox.core.domain.repository.ActionRepository
 import com.selinuxtoolbox.core.domain.repository.BackupOrchestrator
 import com.selinuxtoolbox.core.domain.repository.PolicyRepository
+import com.selinuxtoolbox.core.domain.usecase.RunCleanupUseCase
 import com.selinuxtoolbox.core.domain.usecase.SetActiveProjectUseCase
 import dagger.Module
 import dagger.Provides
@@ -24,6 +26,10 @@ object DomainModule {
     @Provides
     @Singleton
     fun provideAvcDenialParser(): AvcDenialParser = AvcDenialParser()
+
+    @Provides
+    @Singleton
+    fun provideCleanupEngine(): CleanupEngine = CleanupEngine()
 
     @Provides
     @Singleton
@@ -52,4 +58,15 @@ object DomainModule {
         actionRepository: ActionRepository,
         appPreferences: AppPreferences
     ): SetActiveProjectUseCase = SetActiveProjectUseCase(actionRepository, appPreferences)
+
+    @Provides
+    @Singleton
+    fun provideRunCleanupUseCase(
+        cleanupEngine: CleanupEngine,
+        backupOrchestrator: BackupOrchestrator,
+        actionRepository: ActionRepository,
+        appPreferences: AppPreferences
+    ): RunCleanupUseCase = RunCleanupUseCase(
+        cleanupEngine, backupOrchestrator, actionRepository, appPreferences
+    )
 }
