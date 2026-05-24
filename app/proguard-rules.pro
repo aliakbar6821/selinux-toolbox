@@ -1,0 +1,9 @@
+-keep class com.topjohnwu.superuser.** { *; }
+-keepnames @dagger.hilt.android.lifecycle.HiltViewModel class * extends androidx.lifecycle.ViewModel
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+-keep,includedescriptorclasses class com.selinuxtoolbox.**$$serializer { *; }
+-keepclassmembers class com.selinuxtoolbox.** { *** Companion; }
+-keepclasseswithmembers class com.selinuxtoolbox.** { kotlinx.serialization.KSerializer serializer(...); }
