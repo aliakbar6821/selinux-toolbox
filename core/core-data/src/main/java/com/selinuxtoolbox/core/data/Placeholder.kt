@@ -1,2 +1,2 @@
 package com.selinuxtoolbox.core.data
-// Data sources will be added in Step 3
+// Package marker — all data layer code is in subpackages
