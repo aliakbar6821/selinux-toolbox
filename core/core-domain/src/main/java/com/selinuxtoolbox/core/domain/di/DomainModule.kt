@@ -3,11 +3,13 @@ package com.selinuxtoolbox.core.domain.di
 import com.selinuxtoolbox.core.data.db.ActionDao
 import com.selinuxtoolbox.core.data.db.NoteDao
 import com.selinuxtoolbox.core.data.db.ProjectDao
+import com.selinuxtoolbox.core.data.prefs.AppPreferences
 import com.selinuxtoolbox.core.data.root.RootFileReader
 import com.selinuxtoolbox.core.data.root.RootShell
 import com.selinuxtoolbox.core.domain.repository.ActionRepository
 import com.selinuxtoolbox.core.domain.repository.BackupOrchestrator
 import com.selinuxtoolbox.core.domain.repository.PolicyRepository
+import com.selinuxtoolbox.core.domain.usecase.SetActiveProjectUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,4 +40,13 @@ object DomainModule {
     fun provideBackupOrchestrator(
         actionRepository: ActionRepository
     ): BackupOrchestrator = BackupOrchestrator(actionRepository)
+
+    // SetActiveProjectUseCase needs both ActionRepository and AppPreferences
+    // so we provide it explicitly here
+    @Provides
+    @Singleton
+    fun provideSetActiveProjectUseCase(
+        actionRepository: ActionRepository,
+        appPreferences: AppPreferences
+    ): SetActiveProjectUseCase = SetActiveProjectUseCase(actionRepository, appPreferences)
 }
