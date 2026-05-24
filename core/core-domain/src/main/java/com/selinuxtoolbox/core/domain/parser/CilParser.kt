@@ -21,7 +21,6 @@ class CilParser(
                     reader.consume()
                 }
             } catch (e: Exception) {
-                // Skip malformed statement — continue parsing
                 reader.skipToNextTopLevel()
             }
         }
@@ -40,56 +39,56 @@ class CilParser(
         val keyword = reader.expectSymbol()
 
         val statement = when (keyword) {
-            "type" -> parseType(reader, startLine)
-            "typeattribute" -> parseTypeAttribute(reader, startLine)
-            "typeattributeset" -> parseTypeAttributeSet(reader, startLine)
-            "allow" -> parseAccessRule(reader, startLine, keyword)
-            "neverallow" -> parseAccessRule(reader, startLine, keyword)
-            "auditallow" -> parseAccessRule(reader, startLine, keyword)
-            "dontaudit" -> parseAccessRule(reader, startLine, keyword)
-            "typetransition" -> parseTypeTransition(reader, startLine)
-            "typechange" -> parseTypeChange(reader, startLine)
-            "roleallow" -> parseRoleAllow(reader, startLine)
-            "genfscon" -> parseGenFsCon(reader, startLine)
-            "typebounds" -> parseGeneric(reader, startLine, keyword)
-            "permissive" -> parseGeneric(reader, startLine, keyword)
-            "expandtypeattribute" -> parseGeneric(reader, startLine, keyword)
-            "sensitivityorder" -> parseGeneric(reader, startLine, keyword)
-            "sensitivity" -> parseGeneric(reader, startLine, keyword)
-            "dominance" -> parseGeneric(reader, startLine, keyword)
-            "category" -> parseGeneric(reader, startLine, keyword)
-            "level" -> parseGeneric(reader, startLine, keyword)
-            "levelrange" -> parseGeneric(reader, startLine, keyword)
-            "mlsconstrain" -> parseGeneric(reader, startLine, keyword)
-            "mlsvalidatetrans" -> parseGeneric(reader, startLine, keyword)
-            "constrain" -> parseGeneric(reader, startLine, keyword)
-            "validatetrans" -> parseGeneric(reader, startLine, keyword)
-            "sidcontext" -> parseGeneric(reader, startLine, keyword)
-            "portcon" -> parseGeneric(reader, startLine, keyword)
-            "netifcon" -> parseGeneric(reader, startLine, keyword)
-            "nodecon" -> parseGeneric(reader, startLine, keyword)
-            "fsuse" -> parseGeneric(reader, startLine, keyword)
-            "ibpkeycon" -> parseGeneric(reader, startLine, keyword)
-            "ibendportcon" -> parseGeneric(reader, startLine, keyword)
-            "role" -> parseGeneric(reader, startLine, keyword)
-            "roletype" -> parseGeneric(reader, startLine, keyword)
-            "rolebounds" -> parseGeneric(reader, startLine, keyword)
-            "user" -> parseGeneric(reader, startLine, keyword)
-            "userrole" -> parseGeneric(reader, startLine, keyword)
-            "userlevel" -> parseGeneric(reader, startLine, keyword)
-            "userrange" -> parseGeneric(reader, startLine, keyword)
-            "userbounds" -> parseGeneric(reader, startLine, keyword)
-            "userprefix" -> parseGeneric(reader, startLine, keyword)
-            "selinuxuser" -> parseGeneric(reader, startLine, keyword)
+            "type"               -> parseType(reader, startLine)
+            "typeattribute"      -> parseTypeAttribute(reader, startLine)
+            "typeattributeset"   -> parseTypeAttributeSet(reader, startLine)
+            "allow"              -> parseAccessRule(reader, startLine, keyword)
+            "neverallow"         -> parseAccessRule(reader, startLine, keyword)
+            "auditallow"         -> parseAccessRule(reader, startLine, keyword)
+            "dontaudit"          -> parseAccessRule(reader, startLine, keyword)
+            "typetransition"     -> parseTypeTransition(reader, startLine)
+            "typechange"         -> parseTypeChange(reader, startLine)
+            "roleallow"          -> parseRoleAllow(reader, startLine)
+            "genfscon"           -> parseGenFsCon(reader, startLine)
+            "typebounds"         -> parseGeneric(reader, startLine, keyword)
+            "permissive"         -> parseGeneric(reader, startLine, keyword)
+            "expandtypeattribute"-> parseGeneric(reader, startLine, keyword)
+            "sensitivityorder"   -> parseGeneric(reader, startLine, keyword)
+            "sensitivity"        -> parseGeneric(reader, startLine, keyword)
+            "dominance"          -> parseGeneric(reader, startLine, keyword)
+            "category"           -> parseGeneric(reader, startLine, keyword)
+            "level"              -> parseGeneric(reader, startLine, keyword)
+            "levelrange"         -> parseGeneric(reader, startLine, keyword)
+            "mlsconstrain"       -> parseGeneric(reader, startLine, keyword)
+            "mlsvalidatetrans"   -> parseGeneric(reader, startLine, keyword)
+            "constrain"          -> parseGeneric(reader, startLine, keyword)
+            "validatetrans"      -> parseGeneric(reader, startLine, keyword)
+            "sidcontext"         -> parseGeneric(reader, startLine, keyword)
+            "portcon"            -> parseGeneric(reader, startLine, keyword)
+            "netifcon"           -> parseGeneric(reader, startLine, keyword)
+            "nodecon"            -> parseGeneric(reader, startLine, keyword)
+            "fsuse"              -> parseGeneric(reader, startLine, keyword)
+            "ibpkeycon"          -> parseGeneric(reader, startLine, keyword)
+            "ibendportcon"       -> parseGeneric(reader, startLine, keyword)
+            "role"               -> parseGeneric(reader, startLine, keyword)
+            "roletype"           -> parseGeneric(reader, startLine, keyword)
+            "rolebounds"         -> parseGeneric(reader, startLine, keyword)
+            "user"               -> parseGeneric(reader, startLine, keyword)
+            "userrole"           -> parseGeneric(reader, startLine, keyword)
+            "userlevel"          -> parseGeneric(reader, startLine, keyword)
+            "userrange"          -> parseGeneric(reader, startLine, keyword)
+            "userbounds"         -> parseGeneric(reader, startLine, keyword)
+            "userprefix"         -> parseGeneric(reader, startLine, keyword)
+            "selinuxuser"        -> parseGeneric(reader, startLine, keyword)
             "selinuxuserdefault" -> parseGeneric(reader, startLine, keyword)
-            "block" -> parseBlock(reader, startLine)
-            "blockinherit" -> parseGeneric(reader, startLine, keyword)
-            "blockabstract" -> parseGeneric(reader, startLine, keyword)
-            "in" -> parseInBlock(reader, startLine)
-            "macro" -> parseMacro(reader, startLine)
-            "call" -> parseGeneric(reader, startLine, keyword)
-            "optional" -> parseOptional(reader, startLine)
-            else -> parseGeneric(reader, startLine, keyword)
+            "block"              -> parseBlock(reader, startLine)
+            "blockinherit"       -> parseGeneric(reader, startLine, keyword)
+            "blockabstract"      -> parseGeneric(reader, startLine, keyword)
+            "in"                 -> parseInBlock(reader, startLine)
+            "macro"              -> parseMacro(reader, startLine)
+            "call"               -> parseGeneric(reader, startLine, keyword)
+            "optional"           -> parseOptional(reader, startLine)
+            else                 -> parseGeneric(reader, startLine, keyword)
         }
 
         reader.tryConsume(TokenType.RPAREN)
@@ -112,18 +111,15 @@ class CilParser(
         val attribute = reader.expectSymbol()
         val members = mutableListOf<String>()
 
-        // Members can be a single symbol or a list in parens
         if (reader.peek().type == TokenType.LPAREN) {
             reader.expect(TokenType.LPAREN)
             while (reader.peek().type != TokenType.RPAREN && !reader.isEof()) {
                 val token = reader.consume()
                 if (token.type == TokenType.SYMBOL) {
-                    // Handle set operators: and, or, not, xor — just collect symbols
                     if (token.value !in listOf("and", "or", "not", "xor")) {
                         members.add(token.value)
                     }
                 } else if (token.type == TokenType.LPAREN) {
-                    // Nested set expression — collect inner symbols
                     var depth = 1
                     while (!reader.isEof() && depth > 0) {
                         val t = reader.consume()
@@ -148,6 +144,13 @@ class CilParser(
         return CilStatement.TypeAttributeSet(attribute, members, sourceFile, line, partition)
     }
 
+    // FIX: Real CIL access rule format is:
+    //   (allow source target (class (perm1 perm2 ...)))
+    //   (allow source target (class perm))         <- single perm without inner parens
+    //
+    // The class and permissions are wrapped in an outer paren group:
+    //   (class_name (perm1 perm2))
+    // We must consume that outer paren to get objectClass, then parse permissions inside.
     private fun parseAccessRule(
         reader: TokenReader,
         line: Int,
@@ -155,8 +158,13 @@ class CilParser(
     ): CilStatement {
         val source = reader.expectSymbol()
         val target = reader.expectSymbol()
+
+        // Expect opening paren of (class (perms)) group
+        reader.expect(TokenType.LPAREN)
         val objectClass = reader.expectSymbol()
         val permissions = parsePermissionSet(reader)
+        // Consume closing paren of (class (perms)) group
+        reader.tryConsume(TokenType.RPAREN)
 
         return when (keyword) {
             "allow" -> CilStatement.AllowRule(
@@ -171,11 +179,18 @@ class CilParser(
             "dontaudit" -> CilStatement.DontAuditRule(
                 source, target, objectClass, permissions, sourceFile, line, partition
             )
-            else -> CilStatement.GenericStatement(keyword,
-                "$source $target $objectClass", sourceFile, line, partition)
+            else -> CilStatement.GenericStatement(
+                keyword,
+                "$source $target $objectClass",
+                sourceFile, line, partition
+            )
         }
     }
 
+    // Parses the permission set inside an access rule.
+    // Handles both:
+    //   (perm1 perm2 perm3)   <- list form
+    //   perm1                 <- single bare symbol (rare but valid in CIL)
     private fun parsePermissionSet(reader: TokenReader): List<String> {
         val perms = mutableListOf<String>()
         if (reader.peek().type == TokenType.LPAREN) {
@@ -196,9 +211,11 @@ class CilParser(
         val target = reader.expectSymbol()
         val objectClass = reader.expectSymbol()
         val defaultType = reader.expectSymbol()
-        // Optional object name (quoted string)
-        val objectName = if (reader.peek().type == TokenType.SYMBOL &&
-            reader.peek().type != TokenType.RPAREN) {
+        // Optional object name (quoted string or symbol before closing paren)
+        val objectName = if (!reader.isEof() &&
+            reader.peek().type == TokenType.SYMBOL &&
+            reader.peek().value != ")"
+        ) {
             reader.expectSymbol()
         } else null
         reader.skipRemaining()
@@ -234,12 +251,10 @@ class CilParser(
         return CilStatement.GenFsCon(fsType, path, context, sourceFile, line, partition)
     }
 
-    // For block/in/macro/optional — parse recursively but return as generic
     private fun parseBlock(reader: TokenReader, line: Int): CilStatement {
         val name = if (reader.peek().type == TokenType.SYMBOL) reader.expectSymbol() else ""
-        val raw = StringBuilder("block $name")
         reader.skipRemaining()
-        return CilStatement.GenericStatement("block", raw.toString(), sourceFile, line, partition)
+        return CilStatement.GenericStatement("block", name, sourceFile, line, partition)
     }
 
     private fun parseInBlock(reader: TokenReader, line: Int): CilStatement {
@@ -271,11 +286,12 @@ class CilParser(
                 else -> {}
             }
         }
-        return CilStatement.GenericStatement(keyword, raw.toString().trim(), sourceFile, line, partition)
+        return CilStatement.GenericStatement(
+            keyword, raw.toString().trim(), sourceFile, line, partition
+        )
     }
 }
 
-// Helper to navigate token list
 class TokenReader(private val tokens: List<Token>) {
     private var pos = 0
 
@@ -310,7 +326,6 @@ class TokenReader(private val tokens: List<Token>) {
 
     fun isEof(): Boolean = peek().type == TokenType.EOF
 
-    // Skip tokens until we close the current statement
     fun skipRemaining() {
         var depth = 0
         while (!isEof()) {
@@ -318,7 +333,7 @@ class TokenReader(private val tokens: List<Token>) {
             when (t.type) {
                 TokenType.LPAREN -> { depth++; consume() }
                 TokenType.RPAREN -> {
-                    if (depth == 0) return  // let caller consume closing paren
+                    if (depth == 0) return
                     depth--
                     consume()
                 }
@@ -328,7 +343,6 @@ class TokenReader(private val tokens: List<Token>) {
         }
     }
 
-    // Skip to next top-level statement after a parse error
     fun skipToNextTopLevel() {
         var depth = 0
         while (!isEof()) {
