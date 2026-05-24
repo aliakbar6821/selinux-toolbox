@@ -2,12 +2,11 @@ package com.selinuxtoolbox.core.domain.usecase
 
 import com.selinuxtoolbox.core.domain.repository.ActionRepository
 import com.selinuxtoolbox.core.domain.repository.BackupOrchestrator
-import com.selinuxtoolbox.core.domain.repository.ActionRepository as Repo
-import javax.inject.Inject
-import java.io.File
+import com.selinuxtoolbox.core.model.Project
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
-import com.selinuxtoolbox.core.model.Project
+import java.io.File
+import javax.inject.Inject
 
 class ImportProjectUseCase @Inject constructor(
     private val backupOrchestrator: BackupOrchestrator,
@@ -29,15 +28,19 @@ class ImportProjectUseCase @Inject constructor(
         val extracted = backupOrchestrator.restoreFullSnapshot(zipFile, tempDir)
         if (!extracted) error("Failed to extract import zip")
 
-        // Read project.json
+        // Read project.json for metadata
         val projectJson = File(tempDir, "project.json")
         val json = Json { ignoreUnknownKeys = true }
 
         val project: Project? = if (projectJson.exists()) {
-            try { json.decodeFromString<Project>(projectJson.readText()) }
-            catch (e: Exception) { null }
+            try {
+                json.decodeFromString<Project>(projectJson.readText())
+            } catch (e: Exception) {
+                null
+            }
         } else null
 
+        // Derive project name from metadata or zip filename
         val projectName = project?.name
             ?: zipFile.nameWithoutExtension.replace(Regex("_\\d+$"), "")
 
@@ -46,14 +49,14 @@ class ImportProjectUseCase @Inject constructor(
         if (finalDir.exists()) finalDir.deleteRecursively()
         tempDir.renameTo(finalDir)
 
-        // Create or update project record in Room
-        val existingProjects = actionRepository.getAllProjects()
-        // Check if project with same name exists — use suspend snapshot
-        val existingId = actionRepository.getProjectById(project?.id ?: -1L)?.id
+        // Check if a project with this ID already exists in Room
+        val existingById = project?.id?.let { actionRepository.getProjectById(it) }
 
-        if (existingId != null) {
-            existingId
+        if (existingById != null) {
+            // Project already in Room — just return existing ID
+            existingById.id
         } else {
+            // Create a new Room record for this imported project
             actionRepository.createProject(
                 name = projectName,
                 sourceDevice = project?.sourceDevice ?: "",
