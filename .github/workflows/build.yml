@@ -12,9 +12,9 @@ on:
         required: false
         default: 'android-15.0.0_r1'
       verbose_build:
-        description: 'Verbose binary build (true/false)'
+        description: 'Verbose binary build (1=on, 0=off)'
         required: false
-        default: 'false'
+        default: '0'
 
 env:
   NDK_VERSION: r27c
@@ -22,14 +22,11 @@ env:
 
 jobs:
   # ===========================================================================
-  # Job 1: Build ARM64 native binaries from AOSP source
+  # Job 1: Build ARM64 native binaries
   # ===========================================================================
   build-native-binaries:
     name: Build ARM64 secilc + sepolicy-analyze
     runs-on: ubuntu-latest
-
-    outputs:
-      cache-key: ${{ steps.cache-key.outputs.key }}
 
     steps:
       - name: Checkout repository
@@ -38,7 +35,7 @@ jobs:
       - name: Generate cache key
         id: cache-key
         run: |
-          KEY="sepolicy-tools-${{ env.AOSP_SELINUX_TAG }}-ndk-${{ env.NDK_VERSION }}-v3"
+          KEY="sepolicy-tools-${{ env.AOSP_SELINUX_TAG }}-ndk-${{ env.NDK_VERSION }}-v5"
           echo "key=$KEY" >> "$GITHUB_OUTPUT"
           echo "Cache key: $KEY"
 
@@ -76,7 +73,6 @@ jobs:
           unzip -q /tmp/ndk.zip -d "$HOME/"
           mv "$HOME/android-ndk-${{ env.NDK_VERSION }}" "$HOME/android-ndk"
           rm -f /tmp/ndk.zip
-          echo "NDK ready: $(ls $HOME/android-ndk/)"
 
       - name: Build secilc and sepolicy-analyze (ARM64)
         if: steps.cache-binaries.outputs.cache-hit != 'true'
@@ -93,15 +89,10 @@ jobs:
 
       - name: Verify binaries
         run: |
-          echo "=== Output directory ==="
           ls -lh app/src/main/assets/bin/
-          echo "=== File types ==="
           for binary in secilc sepolicy-analyze; do
             path="app/src/main/assets/bin/$binary"
-            if [ ! -f "$path" ]; then
-              echo "ERROR: $path not found!"
-              exit 1
-            fi
+            [ -f "$path" ] || { echo "ERROR: $path missing"; exit 1; }
             file "$path"
           done
 
@@ -138,7 +129,7 @@ jobs:
           name: sepolicy-binaries-arm64
           path: app/src/main/assets/bin/
 
-      - name: Verify and fix binary permissions
+      - name: Set binary permissions
         run: |
           ls -lh app/src/main/assets/bin/
           chmod +x app/src/main/assets/bin/secilc
@@ -187,11 +178,10 @@ jobs:
           if-no-files-found: error
 
       - name: Print APK sizes
-        run: |
-          find app/build/outputs/apk -name "*.apk" -exec du -sh {} \;
+        run: find app/build/outputs/apk -name "*.apk" -exec du -sh {} \;
 
   # ===========================================================================
-  # Job 3: Release (tag-triggered only)
+  # Job 3: Release on version tag
   # ===========================================================================
   release:
     name: Create Release
