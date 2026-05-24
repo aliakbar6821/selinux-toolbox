@@ -14,8 +14,6 @@ import com.selinuxtoolbox.core.domain.usecase.ImportProjectUseCase
 import com.selinuxtoolbox.core.domain.usecase.SetActiveProjectUseCase
 import com.selinuxtoolbox.core.domain.usecase.ValidateActionsUseCase
 import com.selinuxtoolbox.core.model.ActionRecord
-import com.selinuxtoolbox.core.model.ActionType
-import com.selinuxtoolbox.core.model.ActionValidity
 import com.selinuxtoolbox.core.model.ActionValidation
 import com.selinuxtoolbox.core.model.Project
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -67,19 +65,22 @@ sealed class ProjectsEvent {
 
 @HiltViewModel
 class ProjectsViewModel @Inject constructor(
-    // Split into two groups to work around KSP 11-parameter limit issues
-    private val getAllProjects: GetAllProjectsUseCase,
-    private val createProject: CreateProjectUseCase,
-    private val deleteProject: DeleteProjectUseCase,
-    private val archiveProject: ArchiveProjectUseCase,
-    private val setActiveProject: SetActiveProjectUseCase,
-    private val exportProject: ExportProjectUseCase,
-    private val importProject: ImportProjectUseCase,
-    private val getProjectActions: GetProjectActionsUseCase,
-    private val validateActions: ValidateActionsUseCase,
-    private val addNote: AddNoteUseCase,
+    private val getAllProjectsUseCase: GetAllProjectsUseCase,
+    private val createProjectUseCase: CreateProjectUseCase,
+    private val deleteProjectUseCase: DeleteProjectUseCase,
+    private val archiveProjectUseCase: ArchiveProjectUseCase,
+    private val setActiveProjectUseCase: SetActiveProjectUseCase,
+    private val exportProjectUseCase: ExportProjectUseCase,
+    private val importProjectUseCase: ImportProjectUseCase,
+    private val getProjectActionsUseCase: GetProjectActionsUseCase,
+    private val validateActionsUseCase: ValidateActionsUseCase,
+    private val addNoteUseCase: AddNoteUseCase,
     private val appPreferences: AppPreferences
 ) : ViewModel() {
+
+    // -------------------------------------------------------------------------
+    // UI State
+    // -------------------------------------------------------------------------
 
     private val _uiState = MutableStateFlow(ProjectsUiState())
     val uiState: StateFlow<ProjectsUiState> = _uiState.asStateFlow()
@@ -104,10 +105,14 @@ class ProjectsViewModel @Inject constructor(
         observeProjects()
     }
 
+    // -------------------------------------------------------------------------
+    // Observe all projects
+    // -------------------------------------------------------------------------
+
     private fun observeProjects() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            getAllProjects().collect { projects ->
+            getAllProjectsUseCase().collect { projects ->
                 _uiState.update {
                     it.copy(projects = projects, isLoading = false, error = null)
                 }
@@ -115,10 +120,14 @@ class ProjectsViewModel @Inject constructor(
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Project detail
+    // -------------------------------------------------------------------------
+
     fun loadProjectDetail(project: Project) {
         _detailState.update { it.copy(project = project, isLoading = true) }
         viewModelScope.launch {
-            getProjectActions(project.id).collect { actions ->
+            getProjectActionsUseCase(project.id).collect { actions ->
                 _detailState.update {
                     it.copy(actions = actions, isLoading = false)
                 }
@@ -129,12 +138,16 @@ class ProjectsViewModel @Inject constructor(
     fun validateProjectActions(projectId: Long) {
         viewModelScope.launch {
             _detailState.update { it.copy(isLoadingValidations = true) }
-            val validations = validateActions(projectId)
+            val validations = validateActionsUseCase(projectId)
             _detailState.update {
                 it.copy(validations = validations, isLoadingValidations = false)
             }
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Form field updates
+    // -------------------------------------------------------------------------
 
     fun onNameChange(value: String) =
         _formState.update { it.copy(name = value, nameError = null) }
@@ -153,6 +166,10 @@ class ProjectsViewModel @Inject constructor(
 
     fun resetForm() = _formState.update { CreateProjectFormState() }
 
+    // -------------------------------------------------------------------------
+    // Create project
+    // -------------------------------------------------------------------------
+
     fun submitCreateProject() {
         val form = _formState.value
         if (form.name.isBlank()) {
@@ -163,69 +180,108 @@ class ProjectsViewModel @Inject constructor(
             it.name.equals(form.name.trim(), ignoreCase = true)
         }
         if (duplicate) {
-            _formState.update { it.copy(nameError = "A project with this name already exists") }
+            _formState.update {
+                it.copy(nameError = "A project with this name already exists")
+            }
             return
         }
         viewModelScope.launch {
             _formState.update { it.copy(isSubmitting = true) }
-            createProject(
+            val result = createProjectUseCase(
                 name = form.name.trim(),
                 sourceDevice = form.sourceDevice.trim(),
                 targetDevice = form.targetDevice.trim(),
                 sourceRom = form.sourceRom.trim(),
                 targetRom = form.targetRom.trim(),
                 outputBasePath = outputPath.value
-            ).fold(
+            )
+            result.fold(
                 onSuccess = { projectId ->
                     _formState.update { CreateProjectFormState() }
                     _events.emit(ProjectsEvent.ProjectCreated(projectId))
                 },
                 onFailure = { e ->
-                    _events.emit(ProjectsEvent.Error(e.message ?: "Failed to create project"))
+                    _events.emit(
+                        ProjectsEvent.Error(e.message ?: "Failed to create project")
+                    )
                 }
             )
             _formState.update { it.copy(isSubmitting = false) }
         }
     }
 
-    fun deleteProject(project: Project) {
+    // -------------------------------------------------------------------------
+    // Delete project
+    // Public function named onDeleteProject to avoid collision with
+    // injected deleteProjectUseCase property
+    // -------------------------------------------------------------------------
+
+    fun onDeleteProject(project: Project) {
         viewModelScope.launch {
-            deleteProject(project.id).fold(
-                onSuccess = { _events.emit(ProjectsEvent.ProjectDeleted(project.name)) },
+            val result = deleteProjectUseCase(project.id)
+            result.fold(
+                onSuccess = {
+                    _events.emit(ProjectsEvent.ProjectDeleted(project.name))
+                },
                 onFailure = { e ->
-                    _events.emit(ProjectsEvent.Error(e.message ?: "Failed to delete project"))
+                    _events.emit(
+                        ProjectsEvent.Error(e.message ?: "Failed to delete project")
+                    )
                 }
             )
         }
     }
 
-    fun archiveProject(projectId: Long) {
+    // -------------------------------------------------------------------------
+    // Archive project
+    // -------------------------------------------------------------------------
+
+    fun onArchiveProject(projectId: Long) {
         viewModelScope.launch {
-            archiveProject(projectId).fold(
+            val result = archiveProjectUseCase(projectId)
+            result.fold(
                 onSuccess = {},
                 onFailure = { e ->
-                    _events.emit(ProjectsEvent.Error(e.message ?: "Failed to archive project"))
+                    _events.emit(
+                        ProjectsEvent.Error(e.message ?: "Failed to archive project")
+                    )
                 }
             )
         }
     }
 
-    fun setActive(projectId: Long) {
+    // -------------------------------------------------------------------------
+    // Set active project
+    // -------------------------------------------------------------------------
+
+    fun onSetActiveProject(projectId: Long) {
         viewModelScope.launch {
-            setActiveProject(projectId).fold(
-                onSuccess = { _events.emit(ProjectsEvent.ActiveProjectSet(projectId)) },
+            val result = setActiveProjectUseCase(projectId)
+            result.fold(
+                onSuccess = {
+                    _events.emit(ProjectsEvent.ActiveProjectSet(projectId))
+                },
                 onFailure = { e ->
-                    _events.emit(ProjectsEvent.Error(e.message ?: "Failed to set active project"))
+                    _events.emit(
+                        ProjectsEvent.Error(e.message ?: "Failed to set active project")
+                    )
                 }
             )
         }
     }
 
-    fun exportProject(projectId: Long) {
+    // -------------------------------------------------------------------------
+    // Export project
+    // -------------------------------------------------------------------------
+
+    fun onExportProject(projectId: Long) {
         viewModelScope.launch {
             val exportsDir = "${outputPath.value}/exports"
-            exportProject(projectId, exportsDir).fold(
-                onSuccess = { zipPath -> _events.emit(ProjectsEvent.ExportSuccess(zipPath)) },
+            val result = exportProjectUseCase(projectId, exportsDir)
+            result.fold(
+                onSuccess = { zipPath ->
+                    _events.emit(ProjectsEvent.ExportSuccess(zipPath))
+                },
                 onFailure = { e ->
                     _events.emit(ProjectsEvent.Error(e.message ?: "Export failed"))
                 }
@@ -233,11 +289,18 @@ class ProjectsViewModel @Inject constructor(
         }
     }
 
-    fun importProject(zipPath: String) {
+    // -------------------------------------------------------------------------
+    // Import project
+    // -------------------------------------------------------------------------
+
+    fun onImportProject(zipPath: String) {
         viewModelScope.launch {
             val projectsDir = "${outputPath.value}/projects"
-            importProject(zipPath, projectsDir).fold(
-                onSuccess = { projectId -> _events.emit(ProjectsEvent.ImportSuccess(projectId)) },
+            val result = importProjectUseCase(zipPath, projectsDir)
+            result.fold(
+                onSuccess = { projectId ->
+                    _events.emit(ProjectsEvent.ImportSuccess(projectId))
+                },
                 onFailure = { e ->
                     _events.emit(ProjectsEvent.Error(e.message ?: "Import failed"))
                 }
@@ -245,17 +308,24 @@ class ProjectsViewModel @Inject constructor(
         }
     }
 
-    fun addNote(
+    // -------------------------------------------------------------------------
+    // Add note
+    // -------------------------------------------------------------------------
+
+    fun onAddNote(
         projectId: Long,
         content: String,
         tags: List<String> = emptyList(),
         actionId: Long? = null
     ) {
         viewModelScope.launch {
-            addNote(projectId, content, tags, actionId).fold(
+            val result = addNoteUseCase(projectId, content, tags, actionId)
+            result.fold(
                 onSuccess = {},
                 onFailure = { e ->
-                    _events.emit(ProjectsEvent.Error(e.message ?: "Failed to add note"))
+                    _events.emit(
+                        ProjectsEvent.Error(e.message ?: "Failed to add note")
+                    )
                 }
             )
         }

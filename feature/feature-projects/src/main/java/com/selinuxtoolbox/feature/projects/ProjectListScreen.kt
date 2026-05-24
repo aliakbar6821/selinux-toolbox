@@ -73,10 +73,11 @@ fun ProjectListScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Collect one-shot events
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
+                is ProjectsEvent.ProjectCreated ->
+                    navController.navigateToProjectDetail(event.projectId)
                 is ProjectsEvent.ProjectDeleted ->
                     snackbarHostState.showSnackbar("Deleted: ${event.name}")
                 is ProjectsEvent.ExportSuccess ->
@@ -87,10 +88,6 @@ fun ProjectListScreen(
                     snackbarHostState.showSnackbar("Active project updated")
                 is ProjectsEvent.Error ->
                     snackbarHostState.showSnackbar("Error: ${event.message}")
-                is ProjectsEvent.ProjectCreated -> {
-                    // Navigate to detail after creation
-                    navController.navigateToProjectDetail(event.projectId)
-                }
             }
         }
     }
@@ -99,10 +96,7 @@ fun ProjectListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        "Projects",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
+                    Text("Projects", style = MaterialTheme.typography.headlineSmall)
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
@@ -121,50 +115,36 @@ fun ProjectListScreen(
         when {
             uiState.isLoading -> {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
+                    modifier = Modifier.fillMaxSize().padding(padding),
                     contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
+                ) { CircularProgressIndicator() }
             }
 
             uiState.projects.isEmpty() -> {
                 EmptyProjectsPlaceholder(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
+                    modifier = Modifier.fillMaxSize().padding(padding),
                     onCreateClick = { navController.navigateToCreateProject() }
                 )
             }
 
             else -> {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
+                    modifier = Modifier.fillMaxSize().padding(padding),
                     contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 8.dp,
-                        bottom = 88.dp  // leave space for FAB
+                        start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp
                     ),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(
-                        items = uiState.projects,
-                        key = { it.id }
-                    ) { project ->
+                    items(items = uiState.projects, key = { it.id }) { project ->
                         ProjectCard(
                             project = project,
                             onCardClick = {
                                 navController.navigateToProjectDetail(project.id)
                             },
-                            onSetActive = { viewModel.setActive(project.id) },
-                            onExport = { viewModel.exportProject(project.id) },
-                            onArchive = { viewModel.archiveProject(project.id) },
-                            onDelete = { viewModel.deleteProject(project) }
+                            onSetActive = { viewModel.onSetActiveProject(project.id) },
+                            onExport = { viewModel.onExportProject(project.id) },
+                            onArchive = { viewModel.onArchiveProject(project.id) },
+                            onDelete = { viewModel.onDeleteProject(project) }
                         )
                     }
                 }
@@ -190,16 +170,15 @@ private fun ProjectCard(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Delete Project") },
             text = {
-                Text("Delete \"${project.name}\"? This cannot be undone. " +
-                     "The project folder on SD card will remain.")
+                Text(
+                    "Delete \"${project.name}\"? This cannot be undone. " +
+                    "The project folder on SD card will remain."
+                )
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDelete()
-                    }
-                ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = { showDeleteDialog = false; onDelete() }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") }
@@ -212,9 +191,7 @@ private fun ProjectCard(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -237,7 +214,6 @@ private fun ProjectCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More options")
@@ -248,31 +224,24 @@ private fun ProjectCard(
                     ) {
                         DropdownMenuItem(
                             text = { Text("Set Active") },
-                            leadingIcon = { Icon(Icons.Default.Star, contentDescription = null) },
-                            onClick = {
-                                menuExpanded = false
-                                onSetActive()
-                            }
+                            leadingIcon = {
+                                Icon(Icons.Default.Star, contentDescription = null)
+                            },
+                            onClick = { menuExpanded = false; onSetActive() }
                         )
                         DropdownMenuItem(
                             text = { Text("Export") },
                             leadingIcon = {
                                 Icon(Icons.Default.IosShare, contentDescription = null)
                             },
-                            onClick = {
-                                menuExpanded = false
-                                onExport()
-                            }
+                            onClick = { menuExpanded = false; onExport() }
                         )
                         DropdownMenuItem(
                             text = { Text("Archive") },
                             leadingIcon = {
                                 Icon(Icons.Default.Archive, contentDescription = null)
                             },
-                            onClick = {
-                                menuExpanded = false
-                                onArchive()
-                            }
+                            onClick = { menuExpanded = false; onArchive() }
                         )
                         DropdownMenuItem(
                             text = {
@@ -285,27 +254,19 @@ private fun ProjectCard(
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             },
-                            onClick = {
-                                menuExpanded = false
-                                showDeleteDialog = true
-                            }
+                            onClick = { menuExpanded = false; showDeleteDialog = true }
                         )
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-
-            // ROM info row
             Text(
                 text = "${project.sourceRom} → ${project.targetRom}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-
             Spacer(modifier = Modifier.height(8.dp))
-
-            // Status chip + last modified
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -331,12 +292,7 @@ private fun ProjectStatusChip(status: ProjectStatus) {
     }
     SuggestionChip(
         onClick = {},
-        label = {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall
-            )
-        },
+        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
         colors = SuggestionChipDefaults.suggestionChipColors(
             containerColor = color.copy(alpha = 0.15f),
             labelColor = color
@@ -380,7 +336,5 @@ private fun EmptyProjectsPlaceholder(
     }
 }
 
-private fun formatDate(timestamp: Long): String {
-    val sdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-    return sdf.format(Date(timestamp))
-}
+private fun formatDate(timestamp: Long): String =
+    SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(timestamp))
