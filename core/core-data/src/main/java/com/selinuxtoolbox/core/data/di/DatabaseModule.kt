@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.selinuxtoolbox.core.data.db.ActionDao
 import com.selinuxtoolbox.core.data.db.AppDatabase
+import com.selinuxtoolbox.core.data.db.FileSnapshotDao
 import com.selinuxtoolbox.core.data.db.NoteDao
 import com.selinuxtoolbox.core.data.db.ProjectDao
 import dagger.Module
@@ -37,4 +38,7 @@ object DatabaseModule {
 
     @Provides
     fun provideNoteDao(db: AppDatabase): NoteDao = db.noteDao()
+
+    @Provides
+    fun provideFileSnapshotDao(db: AppDatabase): FileSnapshotDao = db.fileSnapshotDao()
 }

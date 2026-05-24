@@ -11,7 +11,7 @@ import java.util.zip.ZipOutputStream
 
 object FileUtil {
 
-    // Compute SHA256 of a file
+    // Compute SHA256 of a file using streaming — avoids loading entire file into memory
     suspend fun sha256(file: File): String = withContext(Dispatchers.IO) {
         val digest = MessageDigest.getInstance("SHA-256")
         FileInputStream(file).use { fis ->
@@ -31,7 +31,21 @@ object FileUtil {
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    // Create a zip from a list of files
+    // Create a zip from a list of files.
+    //
+    // baseDir MUST be set to a common ancestor directory of all files.
+    // Zip entries will be stored as paths relative to baseDir.
+    //
+    // Example:
+    //   file     = /sdcard/SELinuxToolbox/projects/Foo/output/vendor/vendor_sepolicy.cil
+    //   baseDir  = /sdcard/SELinuxToolbox/projects/Foo/output
+    //   entry    = vendor/vendor_sepolicy.cil
+    //
+    // This means extractZip() can reconstruct the full directory structure
+    // correctly, and undoAction() can locate the right file by relative path.
+    //
+    // If baseDir is empty, falls back to filename-only (legacy — avoid for
+    // multi-file backups where name collisions are possible).
     suspend fun createZip(
         files: List<File>,
         outputZip: File,
@@ -43,8 +57,12 @@ object FileUtil {
                 files.forEach { file ->
                     if (file.exists() && file.isFile) {
                         val entryName = if (baseDir.isNotEmpty()) {
-                            file.absolutePath.removePrefix(baseDir).trimStart('/')
+                            // Strip baseDir prefix and leading slash to get relative path
+                            file.absolutePath
+                                .removePrefix(baseDir)
+                                .trimStart('/', '\\')
                         } else {
+                            // Fallback: filename only (only safe for single-file zips)
                             file.name
                         }
                         zos.putNextEntry(ZipEntry(entryName))
@@ -59,7 +77,8 @@ object FileUtil {
         }
     }
 
-    // Extract a zip to a directory
+    // Extract a zip to a directory.
+    // Reconstructs the relative directory structure stored in the zip entries.
     suspend fun extractZip(zipFile: File, targetDir: File): Boolean =
         withContext(Dispatchers.IO) {
             try {
@@ -68,6 +87,14 @@ object FileUtil {
                     var entry = zis.nextEntry
                     while (entry != null) {
                         val outFile = File(targetDir, entry.name)
+                        // Security: prevent zip slip attack
+                        val canonicalTarget = targetDir.canonicalPath
+                        val canonicalOut = outFile.canonicalPath
+                        if (!canonicalOut.startsWith(canonicalTarget)) {
+                            // Skip entries that try to escape the target directory
+                            entry = zis.nextEntry
+                            continue
+                        }
                         if (entry.isDirectory) {
                             outFile.mkdirs()
                         } else {
@@ -106,6 +133,28 @@ object FileUtil {
             .forEach { it.mkdirs() }
 
         return ProjectDirs(project, originalBackup, output, actionBackups, reports, importedLogs)
+    }
+
+    // Find the common ancestor directory of a list of files.
+    // Used to compute baseDir for createZip so relative paths are preserved.
+    fun commonAncestor(files: List<File>): File? {
+        if (files.isEmpty()) return null
+        if (files.size == 1) return files[0].parentFile
+
+        var ancestor = files[0].parentFile
+        for (file in files.drop(1)) {
+            ancestor = commonAncestor(ancestor ?: return null, file.parentFile ?: return null)
+        }
+        return ancestor
+    }
+
+    private fun commonAncestor(a: File, b: File): File {
+        val aParts = a.canonicalPath.split(File.separator)
+        val bParts = b.canonicalPath.split(File.separator)
+        val common = aParts.zip(bParts)
+            .takeWhile { (x, y) -> x == y }
+            .map { it.first }
+        return File(common.joinToString(File.separator))
     }
 
     data class OutputDirs(

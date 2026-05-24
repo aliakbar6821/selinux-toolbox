@@ -41,27 +41,28 @@ class BackupOrchestrator @Inject constructor(
 ) {
 
     // -------------------------------------------------------------------------
-    // Core workflow: snapshot → apply → log
+    // Core workflow: snapshot → zip → record → apply → update hashes
     //
     // Every feature that modifies files calls this instead of writing directly.
     // Guarantees:
     //   1. Backup zip created BEFORE any file is touched
-    //   2. Action recorded in Room with file hashes
-    //   3. On failure: backup zip is left intact for manual recovery
+    //   2. Zip entries use relative paths (no filename collision possible)
+    //   3. Action recorded in Room with file hashes before and after
+    //   4. On failure: backup zip is left intact for manual recovery
     // -------------------------------------------------------------------------
 
     suspend fun executeWithBackup(
         projectId: Long,
         actionType: ActionType,
         description: String,
-        projectOutputDir: String,     // e.g. /sdcard/SELinuxToolbox/projects/MyProject
-        filesToModify: List<File>,    // files that WILL be changed
+        projectOutputDir: String,
+        filesToModify: List<File>,
         metadata: Map<String, String> = emptyMap(),
         action: suspend () -> Map<File, String>  // returns Map<file, newContent>
     ): BackupResult = withContext(Dispatchers.IO) {
         try {
             // ------------------------------------------------------------------
-            // 1. Snapshot original state of all files before touching anything
+            // 1. Snapshot original state of all files
             // ------------------------------------------------------------------
             val snapshots = mutableListOf<FileSnapshot>()
             val originalContents = mutableMapOf<File, String?>()
@@ -74,18 +75,21 @@ class BackupOrchestrator @Inject constructor(
                     FileSnapshot(
                         filePath = file.absolutePath,
                         originalHash = originalHash,
-                        modifiedHash = null,    // filled after apply
-                        operation = when {
-                            !file.exists() -> FileOperation.CREATED
-                            else -> FileOperation.MODIFIED
-                        }
+                        modifiedHash = null,
+                        operation = if (!file.exists()) FileOperation.CREATED
+                                    else FileOperation.MODIFIED
                     )
                 )
             }
 
             // ------------------------------------------------------------------
-            // 2. Create backup zip of original files
-            //    Zip goes to: projectOutputDir/action_backups/<timestamp>.zip
+            // 2. Create backup zip with relative paths preserved
+            //
+            // Use the common ancestor of all files as baseDir so that
+            // zip entries look like:
+            //   vendor/vendor_sepolicy.cil
+            //   system/plat_sepolicy.cil
+            // instead of just the filename — preventing collision on restore.
             // ------------------------------------------------------------------
             val backupDir = File(projectOutputDir, "action_backups")
             backupDir.mkdirs()
@@ -93,11 +97,20 @@ class BackupOrchestrator @Inject constructor(
             val backupZip = File(backupDir, "backup_${timestamp}.zip")
 
             val existingFiles = filesToModify.filter { it.exists() }
+
+            // Compute baseDir: common ancestor of all files being backed up.
+            // Falls back to empty string (filename-only) only if single file.
+            val baseDir = if (existingFiles.size > 1) {
+                FileUtil.commonAncestor(existingFiles)?.canonicalPath ?: ""
+            } else {
+                existingFiles.firstOrNull()?.parentFile?.canonicalPath ?: ""
+            }
+
             if (existingFiles.isNotEmpty()) {
                 val zipOk = FileUtil.createZip(
                     files = existingFiles,
                     outputZip = backupZip,
-                    baseDir = ""
+                    baseDir = baseDir
                 )
                 if (!zipOk) {
                     return@withContext BackupResult.Failure(
@@ -105,19 +118,24 @@ class BackupOrchestrator @Inject constructor(
                     )
                 }
             } else {
-                // No existing files — create empty marker zip
                 backupZip.createNewFile()
             }
 
+            // Store baseDir in metadata so undoAction knows how to restore
+            val enrichedMetadata = metadata + mapOf(
+                "backup_base_dir" to baseDir,
+                "backup_zip_path" to backupZip.absolutePath
+            )
+
             // ------------------------------------------------------------------
-            // 3. Record action start in Room (before applying changes)
+            // 3. Record action start in Room (BEFORE applying changes)
             // ------------------------------------------------------------------
             val actionId = actionRepository.recordActionStart(
                 projectId = projectId,
                 type = actionType,
                 description = description,
                 backupZipPath = backupZip.absolutePath,
-                metadata = metadata
+                metadata = enrichedMetadata
             )
 
             // ------------------------------------------------------------------
@@ -127,11 +145,9 @@ class BackupOrchestrator @Inject constructor(
                 action()
             } catch (e: Exception) {
                 // Action failed — backup zip is still intact
-                // Mark action as failed in metadata but do not delete it
                 actionRepository.recordActionComplete(actionId, snapshots)
                 return@withContext BackupResult.Failure(
-                    "Action execution failed: ${e.message}",
-                    e
+                    "Action execution failed: ${e.message}", e
                 )
             }
 
@@ -149,7 +165,6 @@ class BackupOrchestrator @Inject constructor(
                     val modifiedHash = FileUtil.sha256(newContent)
                     finalSnapshots.add(snapshot.copy(modifiedHash = modifiedHash))
                 } else {
-                    // File was in the list but action did not produce output for it
                     finalSnapshots.add(snapshot)
                 }
             }
@@ -167,8 +182,7 @@ class BackupOrchestrator @Inject constructor(
 
         } catch (e: Exception) {
             BackupResult.Failure(
-                "Unexpected error during backup+apply: ${e.message}",
-                e
+                "Unexpected error during backup+apply: ${e.message}", e
             )
         }
     }
@@ -176,9 +190,9 @@ class BackupOrchestrator @Inject constructor(
     // -------------------------------------------------------------------------
     // Undo a single action
     //
-    // Restores files from the action's backup zip.
-    // Checks if later actions modified the same files (conflict warning).
-    // Action is marked undone in Room but NOT deleted (audit trail preserved).
+    // Restores files from the action's backup zip using relative paths.
+    // The zip was created with baseDir preserved in action metadata.
+    // Relative path = zip entry name → target = originalFilePath parent + entry
     // -------------------------------------------------------------------------
 
     suspend fun undoAction(
@@ -203,7 +217,15 @@ class BackupOrchestrator @Inject constructor(
             }
 
             // ------------------------------------------------------------------
-            // Check for conflicts: later actions that touched the same files
+            // Retrieve the baseDir that was used when the zip was created.
+            // This is the root we need to prepend to each zip entry name
+            // to reconstruct the original absolute file path.
+            // ------------------------------------------------------------------
+            val baseDir = action.metadata["backup_base_dir"] ?: ""
+
+            // ------------------------------------------------------------------
+            // Check for conflicts: later non-undone actions that touched
+            // the same files as this action
             // ------------------------------------------------------------------
             val laterActions = actionRepository.getActionsForProjectOnce(projectId)
                 .filter { it.timestamp > action.timestamp && !it.undone }
@@ -214,11 +236,14 @@ class BackupOrchestrator @Inject constructor(
             }
 
             // ------------------------------------------------------------------
-            // Restore files from backup zip
+            // Extract zip to a temp directory
             // ------------------------------------------------------------------
-            val restoreDir = File(backupZip.parent, "undo_temp_${System.currentTimeMillis()}")
-            val extracted = FileUtil.extractZip(backupZip, restoreDir)
+            val restoreDir = File(
+                backupZip.parentFile,
+                "undo_temp_${System.currentTimeMillis()}"
+            )
 
+            val extracted = FileUtil.extractZip(backupZip, restoreDir)
             if (!extracted) {
                 return@withContext UndoResult.Failure(
                     "Failed to extract backup zip: ${backupZip.absolutePath}"
@@ -227,42 +252,66 @@ class BackupOrchestrator @Inject constructor(
 
             val restoredFiles = mutableListOf<String>()
 
+            // ------------------------------------------------------------------
+            // Restore each file using its original absolute path.
+            //
+            // The zip entry name is the path relative to baseDir.
+            // We reconstruct: File(restoreDir, relativeEntry)
+            // and copy it back to: File(snapshot.filePath)
+            //
+            // For CREATED files (did not exist before this action), we delete
+            // them on undo to restore the pre-action state.
+            // ------------------------------------------------------------------
             for (snapshot in action.changedFiles) {
                 val targetFile = File(snapshot.filePath)
+
                 when (snapshot.operation) {
                     FileOperation.CREATED -> {
-                        // File was created by this action — delete it on undo
+                        // This file was created by the action — remove it on undo
                         if (targetFile.exists()) {
                             targetFile.delete()
                             restoredFiles.add(snapshot.filePath)
                         }
                     }
+
                     FileOperation.MODIFIED -> {
-                        // Restore from backup zip
-                        // The zip entry name is the filename only (from FileUtil.createZip)
-                        val backedUpFile = File(restoreDir, targetFile.name)
+                        // Compute the zip entry name = relative path from baseDir
+                        val relativeEntry = if (baseDir.isNotEmpty()) {
+                            targetFile.canonicalPath
+                                .removePrefix(baseDir)
+                                .trimStart('/', '\\')
+                        } else {
+                            targetFile.name
+                        }
+
+                        val backedUpFile = File(restoreDir, relativeEntry)
                         if (backedUpFile.exists()) {
                             targetFile.parentFile?.mkdirs()
                             backedUpFile.copyTo(targetFile, overwrite = true)
                             restoredFiles.add(snapshot.filePath)
+                        } else {
+                            // Entry not found in zip — log but continue
+                            android.util.Log.w(
+                                "BackupOrchestrator",
+                                "Backup entry not found for restore: $relativeEntry"
+                            )
                         }
                     }
+
                     FileOperation.DELETED -> {
-                        // File was deleted by action — nothing to restore
-                        // (original was deleted, backup has it, but it should
-                        //  not exist in current state after undo either)
+                        // File was deleted by action.
+                        // On undo we want it gone again — nothing to do.
                     }
                 }
             }
 
-            // Clean up temp extraction dir
+            // Clean up temp extraction directory
             restoreDir.deleteRecursively()
 
-            // Mark action as undone in Room
+            // Mark action as undone in Room (never deleted — audit trail)
             actionRepository.markActionUndone(actionId)
 
-            // Return with conflict warning if later actions touched same files
-            if (conflictingActions.isNotEmpty()) {
+            return@withContext if (conflictingActions.isNotEmpty()) {
                 UndoResult.ConflictWarning(
                     restoredFiles = restoredFiles,
                     conflictingActions = conflictingActions
@@ -273,15 +322,14 @@ class BackupOrchestrator @Inject constructor(
 
         } catch (e: Exception) {
             UndoResult.Failure(
-                "Unexpected error during undo: ${e.message}",
-                e
+                "Unexpected error during undo: ${e.message}", e
             )
         }
     }
 
     // -------------------------------------------------------------------------
-    // Create a full project snapshot (used for project export / before
-    // major operations like a full cleanup pass)
+    // Full project snapshot — zip entire source directory
+    // Used for project export and before major operations (full cleanup pass)
     // -------------------------------------------------------------------------
 
     suspend fun createFullSnapshot(
@@ -296,7 +344,7 @@ class BackupOrchestrator @Inject constructor(
             FileUtil.createZip(
                 files = allFiles,
                 outputZip = outputZip,
-                baseDir = sourceDir.absolutePath
+                baseDir = sourceDir.canonicalPath  // preserve full structure in zip
             )
         } catch (e: Exception) {
             false
@@ -304,7 +352,8 @@ class BackupOrchestrator @Inject constructor(
     }
 
     // -------------------------------------------------------------------------
-    // Restore a full project snapshot (used after factory reset / reimport)
+    // Restore a full project snapshot
+    // Used after factory reset + reimport workflow
     // -------------------------------------------------------------------------
 
     suspend fun restoreFullSnapshot(

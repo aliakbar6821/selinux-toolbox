@@ -23,6 +23,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao
     abstract fun actionDao(): ActionDao
     abstract fun noteDao(): NoteDao
+    abstract fun fileSnapshotDao(): FileSnapshotDao
 }
 
 class AppTypeConverters {
