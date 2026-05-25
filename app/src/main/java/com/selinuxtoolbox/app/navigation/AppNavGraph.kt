@@ -8,6 +8,9 @@ import com.selinuxtoolbox.feature.cleanup.CLEANUP_ROUTE
 import com.selinuxtoolbox.feature.cleanup.cleanupScreen
 import com.selinuxtoolbox.feature.dashboard.DASHBOARD_ROUTE
 import com.selinuxtoolbox.feature.dashboard.dashboardScreen
+import com.selinuxtoolbox.feature.denials.DENIALS_ROUTE
+import com.selinuxtoolbox.feature.denials.denialsScreen
+import com.selinuxtoolbox.feature.denials.navigateToDenials
 import com.selinuxtoolbox.feature.offline.RC_SCAN_ROUTE
 import com.selinuxtoolbox.feature.offline.rcScanScreen
 import com.selinuxtoolbox.feature.projects.PROJECTS_ROUTE
@@ -19,12 +22,12 @@ fun AppNavGraph() {
     val navController = rememberNavController()
 
     NavHost(
-        navController = navController,
+        navController    = navController,
         startDestination = DASHBOARD_ROUTE
     ) {
         dashboardScreen(
             onNavigateToProjects = { navController.navigateToProjects() },
-            onNavigateToDenials  = { navController.navigate("denials") }
+            onNavigateToDenials  = { navController.navigateToDenials() }
         )
 
         projectsGraph(navController = navController)
@@ -33,9 +36,8 @@ fun AppNavGraph() {
 
         rcScanScreen()
 
-        composable("denials") {
-            androidx.compose.material3.Text("Denials — coming in Step 4")
-        }
+        denialsScreen()
+
         composable("contexts") {
             androidx.compose.material3.Text("Contexts — coming in Step 5")
         }

@@ -15,6 +15,10 @@ enum class ActionValidity {
 
 enum class FileOperation { MODIFIED, CREATED, DELETED }
 
+enum class ActiveMode { OFFLINE, LIVE }
+
+enum class LogType { DMESG, LOGCAT, LAST_KMSG, UNKNOWN }
+
 @Serializable
 data class FileSnapshot(
     val filePath: String,
@@ -55,6 +59,20 @@ data class ProjectNote(
 )
 
 @Serializable
+data class ImportedLog(
+    val id: Long,
+    val projectId: Long,
+    val fileName: String,
+    val filePath: String,
+    val importedAt: Long,
+    val logType: LogType,
+    val totalLines: Int,
+    val avcDenialCount: Int,
+    val unmappedContextCount: Int,
+    val undefinedTypeCount: Int
+)
+
+@Serializable
 data class Project(
     val id: Long,
     val name: String,
@@ -66,7 +84,6 @@ data class Project(
     val createdAt: Long,
     val lastModified: Long,
     val status: ProjectStatus,
-    // Workspace paths — populated for projects created with workspace setup
     val oemPath: String = "",
     val aospPath: String = "",
     val workPath: String = "",
