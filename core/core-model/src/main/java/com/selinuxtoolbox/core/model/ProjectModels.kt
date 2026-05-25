@@ -15,8 +15,6 @@ enum class ActionValidity {
 
 enum class FileOperation { MODIFIED, CREATED, DELETED }
 
-enum class ActiveMode { OFFLINE, LIVE }
-
 enum class LogType { DMESG, LOGCAT, LAST_KMSG, UNKNOWN }
 
 @Serializable
