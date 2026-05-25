@@ -72,13 +72,12 @@ class ValidateSeclabelsUseCase @Inject constructor(
                         SeclabelStatus.SUSPICIOUS -> "'${domain}_exec' is missing — run RC Seclabel fixer"
                     }
 
-                    // RcService has: name, execPath (may be null), seclabel
                     checks.add(
                         SeclabelCheck(
                             serviceName = service.name,
                             domain      = domain,
                             rcFile      = rcFile.name,
-                            execPath    = service.execPath,
+                            execPath    = service.executable,  // fixed: was service.execPath
                             status      = status,
                             note        = note
                         )

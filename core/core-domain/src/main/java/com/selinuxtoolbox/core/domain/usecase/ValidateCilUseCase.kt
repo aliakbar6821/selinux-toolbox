@@ -1,6 +1,7 @@
 package com.selinuxtoolbox.core.domain.usecase
 
 import com.selinuxtoolbox.core.data.binary.BinaryManager
+import com.selinuxtoolbox.core.data.binary.BinaryResult
 import com.selinuxtoolbox.core.domain.path.PathResolver
 import com.selinuxtoolbox.core.model.ActiveMode
 import kotlinx.coroutines.Dispatchers
@@ -95,21 +96,23 @@ class ValidateCilUseCase @Inject constructor(
         // 4. Pre-checks
         val preChecks = runPreChecks(allFiles)
 
-        // 5. Use BinaryManager.secilcDryRun — it runs secilc -o /dev/null internally
+        // 5. Run secilc dry-run — handle BinaryResult sealed class
         val dryRunResult = binaryManager.secilcDryRun(
             cilFiles = allFiles.map { it.absolutePath }
         )
 
-        if (dryRunResult.exitCode == 0) {
-            CilValidationResult.Pass(
+        when (dryRunResult) {
+            is BinaryResult.Success -> CilValidationResult.Pass(
                 filesChecked = allFiles.size,
                 preChecks    = preChecks
             )
-        } else {
-            CilValidationResult.Fail(
+            is BinaryResult.Failure -> CilValidationResult.Fail(
                 exitCode  = dryRunResult.exitCode,
-                errors    = parseSecilcErrors(dryRunResult.stderr),
+                errors    = parseSecilcErrors(dryRunResult.stderr.joinToString("\n")),
                 preChecks = preChecks
+            )
+            is BinaryResult.BinaryNotReady -> CilValidationResult.SetupError(
+                "secilc binary not ready: ${dryRunResult.binaryName}"
             )
         }
     }
