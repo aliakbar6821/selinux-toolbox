@@ -19,6 +19,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
@@ -27,10 +28,10 @@ import javax.inject.Inject
 // ── UI State ──────────────────────────────────────────────────────────────────
 
 sealed class DenialsStep {
-    object NoProject    : DenialsStep()
-    object Idle         : DenialsStep()
-    object Importing    : DenialsStep()
-    object Analyzing    : DenialsStep()
+    object NoProject  : DenialsStep()
+    object Idle       : DenialsStep()
+    object Importing  : DenialsStep()
+    object Analyzing  : DenialsStep()
     data class Results(
         val groups: List<DenialGroup>,
         val acceptedIds: Set<String>,
@@ -41,11 +42,8 @@ sealed class DenialsStep {
         val intentionalCount: Int,
         val logFileName: String
     ) : DenialsStep()
-    object Applying     : DenialsStep()
-    data class Done(
-        val outputPath: String,
-        val rulesWritten: Int
-    ) : DenialsStep()
+    object Applying : DenialsStep()
+    data class Done(val outputPath: String, val rulesWritten: Int) : DenialsStep()
     data class Error(val message: String) : DenialsStep()
 }
 
@@ -77,16 +75,26 @@ class DenialsViewModel @Inject constructor(
     }
 
     private suspend fun loadProject() {
-        val project = getActiveProject() ?: run {
+        // GetActiveProjectUseCase returns Flow<Project?> — collect first emission
+        val project = getActiveProject().first() ?: run {
             _uiState.update { it.copy(step = DenialsStep.NoProject) }
             return
         }
+
+        // Project (old model) uses projectFolderPath as workPath.
+        // oemPath / aospPath added in recent steps — use them if non-empty,
+        // otherwise fall back to projectFolderPath so old projects still work.
+        val resolvedAospPath = if (project.aospPath.isNotEmpty()) project.aospPath
+                               else project.projectFolderPath
+        val resolvedWorkPath = if (project.workPath.isNotEmpty()) project.workPath
+                               else project.projectFolderPath
+
         _uiState.update {
             it.copy(
                 step        = DenialsStep.Idle,
                 projectName = project.name,
-                aospPath    = project.aospPath,
-                workPath    = project.workPath,
+                aospPath    = resolvedAospPath,
+                workPath    = resolvedWorkPath,
                 projectId   = project.id,
                 mode        = project.activeMode
             )
@@ -103,16 +111,13 @@ class DenialsViewModel @Inject constructor(
                 return@launch
             }
 
-            val importResult = importLog(
+            when (val importResult = importLog(
                 projectId  = state.projectId,
                 workPath   = state.workPath,
                 sourceFile = tempFile
-            )
-
-            when (importResult) {
-                is ImportLogResult.Failure -> {
+            )) {
+                is ImportLogResult.Failure ->
                     _uiState.update { it.copy(step = DenialsStep.Error(importResult.reason)) }
-                }
                 is ImportLogResult.Success -> {
                     _uiState.update { it.copy(step = DenialsStep.Analyzing) }
                     runAnalysis(
@@ -127,7 +132,11 @@ class DenialsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun runAnalysis(logFilePath: String, fileName: String, state: DenialsUiState) {
+    private suspend fun runAnalysis(
+        logFilePath: String,
+        fileName: String,
+        state: DenialsUiState
+    ) {
         val result = analyzeDenials(
             logFilePath = logFilePath,
             aospPath    = state.aospPath,
@@ -135,7 +144,10 @@ class DenialsViewModel @Inject constructor(
         )
 
         val autoAccepted = result.groups
-            .filter { !it.isIntentional && SafetyConfig.classify(it.sourceDomain) == TypeSafety.SAFE }
+            .filter {
+                !it.isIntentional &&
+                SafetyConfig.classify(it.sourceDomain) == TypeSafety.SAFE
+            }
             .map { groupKey(it) }
             .toSet()
 
@@ -156,23 +168,21 @@ class DenialsViewModel @Inject constructor(
     }
 
     fun toggleGroupAccepted(group: DenialGroup) {
-        val state = _uiState.value
-        val results = state.step as? DenialsStep.Results ?: return
-        val key = groupKey(group)
-
+        val results = _uiState.value.step as? DenialsStep.Results ?: return
         if (group.isIntentional) return
         if (SafetyConfig.classify(group.sourceDomain) == TypeSafety.UNSAFE) return
 
-        val newAccepted = if (key in results.acceptedIds) {
+        val key = groupKey(group)
+        val newAccepted = if (key in results.acceptedIds)
             results.acceptedIds - key
-        } else {
+        else
             results.acceptedIds + key
-        }
+
         _uiState.update { it.copy(step = results.copy(acceptedIds = newAccepted)) }
     }
 
     fun applyAcceptedFixes() {
-        val state = _uiState.value
+        val state   = _uiState.value
         val results = state.step as? DenialsStep.Results ?: return
 
         val acceptedGroups = results.groups.filter { groupKey(it) in results.acceptedIds }
@@ -184,19 +194,17 @@ class DenialsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(step = DenialsStep.Applying) }
 
-            when (val result = applyFixes(
+            when (val r = applyFixes(
                 projectId      = state.projectId,
                 workPath       = state.workPath,
                 aospPath       = state.aospPath,
                 mode           = state.mode,
                 acceptedGroups = acceptedGroups
             )) {
-                is ApplyFixResult.Success -> _uiState.update {
-                    it.copy(step = DenialsStep.Done(result.outputFolderPath, result.rulesWritten))
-                }
-                is ApplyFixResult.Failure -> _uiState.update {
-                    it.copy(step = DenialsStep.Error(result.reason))
-                }
+                is ApplyFixResult.Success ->
+                    _uiState.update { it.copy(step = DenialsStep.Done(r.outputFolderPath, r.rulesWritten)) }
+                is ApplyFixResult.Failure ->
+                    _uiState.update { it.copy(step = DenialsStep.Error(r.reason)) }
             }
         }
     }
@@ -210,7 +218,7 @@ class DenialsViewModel @Inject constructor(
 
     private fun uriToTempFile(uri: Uri): File? {
         return try {
-            val ctx = getApplication<Application>()
+            val ctx    = getApplication<Application>()
             val stream = ctx.contentResolver.openInputStream(uri) ?: return null
             val name   = uri.lastPathSegment ?: "imported_log.txt"
             val tmp    = File(ctx.cacheDir, "log_import_$name")
