@@ -5,6 +5,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.selinuxtoolbox.core.model.ActionType
+import com.selinuxtoolbox.core.model.ActiveMode
 import com.selinuxtoolbox.core.model.FileOperation
 import com.selinuxtoolbox.core.model.ProjectStatus
 
@@ -19,7 +20,12 @@ data class ProjectEntity(
     val projectFolderPath: String,
     val createdAt: Long,
     val lastModified: Long,
-    val status: ProjectStatus
+    val status: ProjectStatus,
+    val oemPath: String = "",
+    val aospPath: String = "",
+    val workPath: String = "",
+    val mappingVersion: String = "34.0",
+    val activeMode: ActiveMode = ActiveMode.OFFLINE
 )
 
 @Entity(
@@ -41,10 +47,10 @@ data class ActionEntity(
     val description: String,
     val timestamp: Long,
     val backupZipPath: String,
-    val changedFilesJson: String,   // JSON serialized List<FileSnapshot>
+    val changedFilesJson: String,
     val undone: Boolean = false,
     val undoneAt: Long? = null,
-    val metadataJson: String = "{}" // JSON serialized Map<String,String>
+    val metadataJson: String = "{}"
 )
 
 @Entity(
@@ -65,7 +71,7 @@ data class NoteEntity(
     val actionId: Long?,
     val content: String,
     val timestamp: Long,
-    val tagsJson: String = "[]"     // JSON serialized List<String>
+    val tagsJson: String = "[]"
 )
 
 @Entity(

@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.selinuxtoolbox.core.model.ActiveMode
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -34,4 +35,10 @@ interface ProjectDao {
 
     @Query("UPDATE projects SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String)
+
+    @Query("UPDATE projects SET activeMode = :mode WHERE id = :id")
+    suspend fun updateActiveMode(id: Long, mode: ActiveMode)
+
+    @Query("UPDATE projects SET mappingVersion = :version WHERE id = :id")
+    suspend fun updateMappingVersion(id: Long, version: String)
 }

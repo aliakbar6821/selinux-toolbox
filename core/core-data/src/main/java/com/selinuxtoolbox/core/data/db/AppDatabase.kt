@@ -5,6 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import com.selinuxtoolbox.core.model.ActionType
+import com.selinuxtoolbox.core.model.ActiveMode
 import com.selinuxtoolbox.core.model.FileOperation
 import com.selinuxtoolbox.core.model.ProjectStatus
 
@@ -15,7 +16,7 @@ import com.selinuxtoolbox.core.model.ProjectStatus
         NoteEntity::class,
         FileSnapshotEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(AppTypeConverters::class)
@@ -32,20 +33,23 @@ class AppTypeConverters {
     fun fromProjectStatus(value: ProjectStatus): String = value.name
 
     @TypeConverter
-    fun toProjectStatus(value: String): ProjectStatus =
-        ProjectStatus.valueOf(value)
+    fun toProjectStatus(value: String): ProjectStatus = ProjectStatus.valueOf(value)
 
     @TypeConverter
     fun fromActionType(value: ActionType): String = value.name
 
     @TypeConverter
-    fun toActionType(value: String): ActionType =
-        ActionType.valueOf(value)
+    fun toActionType(value: String): ActionType = ActionType.valueOf(value)
 
     @TypeConverter
     fun fromFileOperation(value: FileOperation): String = value.name
 
     @TypeConverter
-    fun toFileOperation(value: String): FileOperation =
-        FileOperation.valueOf(value)
+    fun toFileOperation(value: String): FileOperation = FileOperation.valueOf(value)
+
+    @TypeConverter
+    fun fromActiveMode(value: ActiveMode): String = value.name
+
+    @TypeConverter
+    fun toActiveMode(value: String): ActiveMode = ActiveMode.valueOf(value)
 }
