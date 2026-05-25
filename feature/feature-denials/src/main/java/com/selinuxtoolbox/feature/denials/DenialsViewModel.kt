@@ -28,12 +28,12 @@ import javax.inject.Inject
 
 sealed class DenialsStep {
     object NoProject    : DenialsStep()
-    object Idle         : DenialsStep()   // project loaded, no log imported yet
+    object Idle         : DenialsStep()
     object Importing    : DenialsStep()
     object Analyzing    : DenialsStep()
     data class Results(
         val groups: List<DenialGroup>,
-        val acceptedIds: Set<String>,     // groupKey of accepted groups
+        val acceptedIds: Set<String>,
         val totalDenials: Int,
         val safeCount: Int,
         val reviewCount: Int,
@@ -93,13 +93,11 @@ class DenialsViewModel @Inject constructor(
         }
     }
 
-    // Called when user picks a log file via SAF picker
     fun onLogFilePicked(uri: Uri) {
         viewModelScope.launch {
             _uiState.update { it.copy(step = DenialsStep.Importing) }
 
             val state = _uiState.value
-            // Resolve Uri to a temp File the use case can read
             val tempFile = uriToTempFile(uri) ?: run {
                 _uiState.update { it.copy(step = DenialsStep.Error("Cannot read selected file")) }
                 return@launch
@@ -136,7 +134,6 @@ class DenialsViewModel @Inject constructor(
             mode        = state.mode
         )
 
-        // Auto-accept all SAFE groups that are not intentional
         val autoAccepted = result.groups
             .filter { !it.isIntentional && SafetyConfig.classify(it.sourceDomain) == TypeSafety.SAFE }
             .map { groupKey(it) }
@@ -163,7 +160,6 @@ class DenialsViewModel @Inject constructor(
         val results = state.step as? DenialsStep.Results ?: return
         val key = groupKey(group)
 
-        // Cannot accept unsafe or intentional groups
         if (group.isIntentional) return
         if (SafetyConfig.classify(group.sourceDomain) == TypeSafety.UNSAFE) return
 
@@ -209,7 +205,8 @@ class DenialsViewModel @Inject constructor(
         viewModelScope.launch { loadProject() }
     }
 
-    private fun groupKey(g: DenialGroup) = "${g.sourceDomain}::${g.targetType}::${g.objectClass}"
+    private fun groupKey(g: DenialGroup) =
+        "${g.sourceDomain}::${g.targetType}::${g.objectClass}"
 
     private fun uriToTempFile(uri: Uri): File? {
         return try {
