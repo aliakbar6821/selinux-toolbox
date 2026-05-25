@@ -9,14 +9,12 @@ import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Result of one pre-validation check (before secilc runs)
 data class PreCheckResult(
     val fileName: String,
     val passed: Boolean,
-    val issues: List<String>   // empty if passed
+    val issues: List<String>
 )
 
-// Full validation result
 sealed class CilValidationResult {
     data class Pass(
         val filesChecked: Int,
@@ -25,7 +23,7 @@ sealed class CilValidationResult {
 
     data class Fail(
         val exitCode: Int,
-        val errors: List<SecilcError>,   // parsed from stderr
+        val errors: List<SecilcError>,
         val preChecks: List<PreCheckResult>
     ) : CilValidationResult()
 
@@ -50,11 +48,12 @@ class ValidateCilUseCase @Inject constructor(
         mode: ActiveMode
     ): CilValidationResult = withContext(Dispatchers.IO) {
 
-        // 1. Get secilc binary
-        val secilc = binaryManager.getSecilcPath()
-            ?: return@withContext CilValidationResult.SetupError(
-                "secilc binary not found. Check app assets."
+        // 1. Check secilc is ready
+        if (!binaryManager.isSecilcReady()) {
+            return@withContext CilValidationResult.SetupError(
+                "secilc binary not ready. Open Settings and initialize binaries first."
             )
+        }
 
         // 2. Build load order
         val mappingVersion = pathResolver.readMappingVersion(aospPath, mode)
@@ -73,11 +72,10 @@ class ValidateCilUseCase @Inject constructor(
                 .toList()
         } else emptyList()
 
-        // Generated attribute files must load before vendor_sepolicy
         val attrFiles  = generatedCil.filter { it.name.contains("attribute") }
         val otherFiles = generatedCil.filter { !it.name.contains("attribute") }
 
-        // Insert attr files just before vendor_sepolicy.cil in the load order
+        // Insert attr files just before vendor_sepolicy.cil
         val vendorIdx = baseCilFiles.indexOfFirst { it.name == "vendor_sepolicy.cil" }
         val allFiles  = if (vendorIdx >= 0) {
             baseCilFiles.toMutableList().also {
@@ -90,105 +88,65 @@ class ValidateCilUseCase @Inject constructor(
 
         if (allFiles.isEmpty()) {
             return@withContext CilValidationResult.SetupError(
-                "No CIL files found. Check that aospPath is set correctly:\n$aospPath"
+                "No CIL files found. Check aospPath is set correctly:\n$aospPath"
             )
         }
 
-        // 4. Pre-checks before running secilc
+        // 4. Pre-checks
         val preChecks = runPreChecks(allFiles)
 
-        // 5. Run secilc dry-run: -o /dev/null means no output binary written
-        val cmd = mutableListOf(
-            secilc,
-            "-o", "/dev/null",
-            "-f", "/dev/null",
-            "-c", "31"
-        ) + allFiles.map { it.absolutePath }
+        // 5. Use BinaryManager.secilcDryRun — it runs secilc -o /dev/null internally
+        val dryRunResult = binaryManager.secilcDryRun(
+            cilFiles = allFiles.map { it.absolutePath }
+        )
 
-        val process = ProcessBuilder(cmd)
-            .redirectErrorStream(false)
-            .start()
-
-        val stderr   = process.errorStream.bufferedReader().readText()
-        val exitCode = process.waitFor()
-
-        if (exitCode == 0) {
+        if (dryRunResult.exitCode == 0) {
             CilValidationResult.Pass(
                 filesChecked = allFiles.size,
                 preChecks    = preChecks
             )
         } else {
             CilValidationResult.Fail(
-                exitCode  = exitCode,
-                errors    = parseSecilcErrors(stderr),
+                exitCode  = dryRunResult.exitCode,
+                errors    = parseSecilcErrors(dryRunResult.stderr),
                 preChecks = preChecks
             )
         }
     }
 
-    // Pre-checks run before secilc — catch common issues fast
     private fun runPreChecks(files: List<File>): List<PreCheckResult> {
-        val results = mutableListOf<PreCheckResult>()
-
-        for (file in files.filter { it.exists() && it.extension == "cil" }) {
+        return files.filter { it.exists() && it.extension == "cil" }.map { file ->
             val issues  = mutableListOf<String>()
             val content = try { file.readText() } catch (e: Exception) {
-                results.add(PreCheckResult(file.name, false, listOf("Cannot read file: ${e.message}")))
-                continue
+                return@map PreCheckResult(file.name, false, listOf("Cannot read: ${e.message}"))
             }
 
-            // Check parenthesis balance
+            // Parenthesis balance
             var depth = 0
-            content.forEach { c ->
-                when (c) {
-                    '(' -> depth++
-                    ')' -> depth--
-                }
-            }
-            if (depth != 0) issues.add("Unbalanced parentheses (net depth=$depth)")
+            content.forEach { c -> when (c) { '(' -> depth++; ')' -> depth-- } }
+            if (depth != 0) issues.add("Unbalanced parentheses (depth=$depth)")
 
-            // Check for duplicate type declarations
-            val typeDecls = Regex("""\(type\s+(\w+)\)""")
-                .findAll(content)
-                .map { it.groupValues[1] }
-                .toList()
-            val dupes = typeDecls.groupBy { it }
-                .filter { it.value.size > 1 }
-                .keys
-            if (dupes.isNotEmpty()) {
-                issues.add("Duplicate type declarations: ${dupes.take(5).joinToString(", ")}")
-            }
+            // Duplicate type declarations
+            val dupes = Regex("""\(type\s+(\w+)\)""")
+                .findAll(content).map { it.groupValues[1] }.toList()
+                .groupBy { it }.filter { it.value.size > 1 }.keys
+            if (dupes.isNotEmpty())
+                issues.add("Duplicate types: ${dupes.take(5).joinToString(", ")}")
 
-            results.add(PreCheckResult(file.name, issues.isEmpty(), issues))
+            PreCheckResult(file.name, issues.isEmpty(), issues)
         }
-
-        return results
     }
 
-    // Parse secilc stderr into structured errors
-    // Typical format: /path/to/file.cil:42: error: message
     private fun parseSecilcErrors(stderr: String): List<SecilcError> {
         val pattern = Regex("""^(.*?):(\d+):\s*(.+)$""", RegexOption.MULTILINE)
-        return stderr.lines()
-            .filter { it.isNotBlank() }
-            .map { line ->
-                val match = pattern.find(line)
-                if (match != null) {
-                    val (filePath, lineNum, msg) = match.destructured
-                    SecilcError(
-                        file    = File(filePath).name,
-                        line    = lineNum.toIntOrNull(),
-                        message = msg.trim(),
-                        rawLine = line
-                    )
-                } else {
-                    SecilcError(
-                        file    = "",
-                        line    = null,
-                        message = line.trim(),
-                        rawLine = line
-                    )
-                }
+        return stderr.lines().filter { it.isNotBlank() }.map { line ->
+            val m = pattern.find(line)
+            if (m != null) {
+                val (filePath, lineNum, msg) = m.destructured
+                SecilcError(File(filePath).name, lineNum.toIntOrNull(), msg.trim(), line)
+            } else {
+                SecilcError("", null, line.trim(), line)
             }
+        }
     }
 }
