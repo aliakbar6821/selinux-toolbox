@@ -8,6 +8,8 @@ import com.selinuxtoolbox.feature.cleanup.CLEANUP_ROUTE
 import com.selinuxtoolbox.feature.cleanup.cleanupScreen
 import com.selinuxtoolbox.feature.dashboard.DASHBOARD_ROUTE
 import com.selinuxtoolbox.feature.dashboard.dashboardScreen
+import com.selinuxtoolbox.feature.offline.RC_SCAN_ROUTE
+import com.selinuxtoolbox.feature.offline.rcScanScreen
 import com.selinuxtoolbox.feature.projects.PROJECTS_ROUTE
 import com.selinuxtoolbox.feature.projects.navigateToProjects
 import com.selinuxtoolbox.feature.projects.projectsGraph
@@ -29,26 +31,28 @@ fun AppNavGraph() {
 
         cleanupScreen()
 
+        rcScanScreen()
+
         composable("denials") {
-            androidx.compose.material3.Text("Denials — coming in Step 9")
+            androidx.compose.material3.Text("Denials — coming in Step 4")
         }
         composable("contexts") {
-            androidx.compose.material3.Text("Contexts — coming in Step 10")
+            androidx.compose.material3.Text("Contexts — coming in Step 5")
         }
         composable("validator") {
-            androidx.compose.material3.Text("Validator — coming in Step 11")
+            androidx.compose.material3.Text("Validator — coming in Step 6")
         }
         composable("conflicts") {
-            androidx.compose.material3.Text("Conflicts — coming in Step 12")
+            androidx.compose.material3.Text("Conflicts — coming in Step 7")
         }
         composable("explorer") {
-            androidx.compose.material3.Text("Explorer — coming in Step 13")
+            androidx.compose.material3.Text("Explorer — coming in Step 8")
         }
         composable("diff") {
-            androidx.compose.material3.Text("Diff — coming in Step 14")
+            androidx.compose.material3.Text("Diff — coming in Step 9")
         }
         composable("compile") {
-            androidx.compose.material3.Text("Compile — coming in Step 15")
+            androidx.compose.material3.Text("Compile — coming in Step 10")
         }
     }
 }

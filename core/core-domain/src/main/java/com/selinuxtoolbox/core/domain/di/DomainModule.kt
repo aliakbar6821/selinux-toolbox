@@ -7,12 +7,17 @@ import com.selinuxtoolbox.core.data.prefs.AppPreferences
 import com.selinuxtoolbox.core.data.root.RootFileReader
 import com.selinuxtoolbox.core.data.root.RootShell
 import com.selinuxtoolbox.core.domain.analyzer.CleanupEngine
+import com.selinuxtoolbox.core.domain.analyzer.RcSeclabelScanner
 import com.selinuxtoolbox.core.domain.parser.AvcDenialParser
+import com.selinuxtoolbox.core.domain.path.PathResolver
+import com.selinuxtoolbox.core.domain.path.WorkspaceValidator
 import com.selinuxtoolbox.core.domain.repository.ActionRepository
 import com.selinuxtoolbox.core.domain.repository.BackupOrchestrator
 import com.selinuxtoolbox.core.domain.repository.PolicyRepository
 import com.selinuxtoolbox.core.domain.usecase.RunCleanupUseCase
+import com.selinuxtoolbox.core.domain.usecase.RunRcSeclabelScanUseCase
 import com.selinuxtoolbox.core.domain.usecase.SetActiveProjectUseCase
+import com.selinuxtoolbox.core.domain.usecase.ValidateWorkspaceUseCase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -23,44 +28,56 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DomainModule {
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideAvcDenialParser(): AvcDenialParser = AvcDenialParser()
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideCleanupEngine(): CleanupEngine = CleanupEngine()
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
+    fun providePathResolver(): PathResolver = PathResolver()
+
+    @Provides @Singleton
+    fun provideWorkspaceValidator(pathResolver: PathResolver): WorkspaceValidator =
+        WorkspaceValidator(pathResolver)
+
+    @Provides @Singleton
+    fun provideRcSeclabelScanner(pathResolver: PathResolver): RcSeclabelScanner =
+        RcSeclabelScanner(pathResolver)
+
+    @Provides @Singleton
+    fun provideValidateWorkspaceUseCase(validator: WorkspaceValidator): ValidateWorkspaceUseCase =
+        ValidateWorkspaceUseCase(validator)
+
+    @Provides @Singleton
+    fun provideRunRcSeclabelScanUseCase(scanner: RcSeclabelScanner): RunRcSeclabelScanUseCase =
+        RunRcSeclabelScanUseCase(scanner)
+
+    @Provides @Singleton
     fun providePolicyRepository(
         rootFileReader: RootFileReader,
         rootShell: RootShell
     ): PolicyRepository = PolicyRepository(rootFileReader, rootShell)
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideActionRepository(
         projectDao: ProjectDao,
         actionDao: ActionDao,
         noteDao: NoteDao
     ): ActionRepository = ActionRepository(projectDao, actionDao, noteDao)
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideBackupOrchestrator(
         actionRepository: ActionRepository
     ): BackupOrchestrator = BackupOrchestrator(actionRepository)
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideSetActiveProjectUseCase(
         actionRepository: ActionRepository,
         appPreferences: AppPreferences
     ): SetActiveProjectUseCase = SetActiveProjectUseCase(actionRepository, appPreferences)
 
-    @Provides
-    @Singleton
+    @Provides @Singleton
     fun provideRunCleanupUseCase(
         cleanupEngine: CleanupEngine,
         backupOrchestrator: BackupOrchestrator,

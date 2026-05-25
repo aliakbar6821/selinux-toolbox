@@ -80,6 +80,7 @@ dependencies {
     implementation(project(":feature:feature-compile"))
     implementation(project(":feature:feature-explorer"))
     implementation(project(":feature:feature-projects"))
+    implementation(project(":feature:feature-offline"))
     implementation(project(":feature:feature-conflicts"))
     implementation(project(":feature:feature-validator"))
     implementation(libs.androidx.core.ktx)

@@ -2,21 +2,21 @@ package com.selinuxtoolbox.core.domain.repository
 
 import com.selinuxtoolbox.core.data.db.ActionDao
 import com.selinuxtoolbox.core.data.db.ActionEntity
-import com.selinuxtoolbox.core.data.db.FileSnapshotEntity
 import com.selinuxtoolbox.core.data.db.NoteDao
 import com.selinuxtoolbox.core.data.db.NoteEntity
 import com.selinuxtoolbox.core.data.db.ProjectDao
 import com.selinuxtoolbox.core.data.db.ProjectEntity
+import com.selinuxtoolbox.core.data.util.FileUtil
 import com.selinuxtoolbox.core.model.ActionRecord
 import com.selinuxtoolbox.core.model.ActionType
 import com.selinuxtoolbox.core.model.ActionValidity
 import com.selinuxtoolbox.core.model.ActionValidation
+import com.selinuxtoolbox.core.model.ActiveMode
 import com.selinuxtoolbox.core.model.FileOperation
 import com.selinuxtoolbox.core.model.FileSnapshot
 import com.selinuxtoolbox.core.model.Project
 import com.selinuxtoolbox.core.model.ProjectNote
 import com.selinuxtoolbox.core.model.ProjectStatus
-import com.selinuxtoolbox.core.data.util.FileUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -35,14 +35,10 @@ class ActionRepository @Inject constructor(
 ) {
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = false }
 
-    // -------------------------------------------------------------------------
-    // Project operations
-    // -------------------------------------------------------------------------
+    // ── Project operations ────────────────────────────────────────────────────
 
     fun getAllProjects(): Flow<List<Project>> =
-        projectDao.getAllProjects().map { entities ->
-            entities.map { it.toProject() }
-        }
+        projectDao.getAllProjects().map { entities -> entities.map { it.toProject() } }
 
     fun getActiveProject(): Flow<Project?> =
         projectDao.getActiveProject().map { it?.toProject() }
@@ -56,7 +52,11 @@ class ActionRepository @Inject constructor(
         targetDevice: String,
         sourceRom: String,
         targetRom: String,
-        projectFolderPath: String
+        projectFolderPath: String,
+        oemPath: String = "",
+        aospPath: String = "",
+        workPath: String = "",
+        mappingVersion: String = "34.0"
     ): Long {
         val now = System.currentTimeMillis()
         val entity = ProjectEntity(
@@ -68,7 +68,12 @@ class ActionRepository @Inject constructor(
             projectFolderPath = projectFolderPath,
             createdAt = now,
             lastModified = now,
-            status = ProjectStatus.ACTIVE
+            status = ProjectStatus.ACTIVE,
+            oemPath = oemPath,
+            aospPath = aospPath,
+            workPath = workPath.ifBlank { projectFolderPath },
+            mappingVersion = mappingVersion,
+            activeMode = ActiveMode.OFFLINE
         )
         return projectDao.insert(entity)
     }
@@ -90,12 +95,8 @@ class ActionRepository @Inject constructor(
         projectDao.delete(entity)
     }
 
-    // -------------------------------------------------------------------------
-    // Action logging
-    // -------------------------------------------------------------------------
+    // ── Action logging ────────────────────────────────────────────────────────
 
-    // Record an action BEFORE applying it.
-    // Returns the action ID — caller uses this to update changedFiles after.
     suspend fun recordActionStart(
         projectId: Long,
         type: ActionType,
@@ -117,19 +118,12 @@ class ActionRepository @Inject constructor(
         return actionId
     }
 
-    // Update the changed files list after an action completes
-    suspend fun recordActionComplete(
-        actionId: Long,
-        changedFiles: List<FileSnapshot>
-    ) {
-        val filesJson = json.encodeToString(changedFiles)
-        actionDao.updateChangedFiles(actionId, filesJson)
+    suspend fun recordActionComplete(actionId: Long, changedFiles: List<FileSnapshot>) {
+        actionDao.updateChangedFiles(actionId, json.encodeToString(changedFiles))
     }
 
     fun getActionsForProject(projectId: Long): Flow<List<ActionRecord>> =
-        actionDao.getActionsForProject(projectId).map { entities ->
-            entities.map { it.toActionRecord() }
-        }
+        actionDao.getActionsForProject(projectId).map { it.map { e -> e.toActionRecord() } }
 
     suspend fun getActionsForProjectOnce(projectId: Long): List<ActionRecord> =
         actionDao.getActionsForProjectOnce(projectId).map { it.toActionRecord() }
@@ -137,29 +131,20 @@ class ActionRepository @Inject constructor(
     suspend fun getActionById(id: Long): ActionRecord? =
         actionDao.getById(id)?.toActionRecord()
 
-    // Mark an action as undone — never delete, just flag
     suspend fun markActionUndone(actionId: Long) {
         actionDao.markUndone(actionId, System.currentTimeMillis())
     }
 
-    // -------------------------------------------------------------------------
-    // Notes
-    // -------------------------------------------------------------------------
+    // ── Notes ─────────────────────────────────────────────────────────────────
 
     fun getNotesForProject(projectId: Long): Flow<List<ProjectNote>> =
-        noteDao.getNotesForProject(projectId).map { entities ->
-            entities.map { it.toProjectNote() }
-        }
+        noteDao.getNotesForProject(projectId).map { it.map { e -> e.toProjectNote() } }
 
     fun getProjectLevelNotes(projectId: Long): Flow<List<ProjectNote>> =
-        noteDao.getProjectLevelNotes(projectId).map { entities ->
-            entities.map { it.toProjectNote() }
-        }
+        noteDao.getProjectLevelNotes(projectId).map { it.map { e -> e.toProjectNote() } }
 
     fun getNotesForAction(projectId: Long, actionId: Long): Flow<List<ProjectNote>> =
-        noteDao.getNotesForAction(projectId, actionId).map { entities ->
-            entities.map { it.toProjectNote() }
-        }
+        noteDao.getNotesForAction(projectId, actionId).map { it.map { e -> e.toProjectNote() } }
 
     suspend fun addNote(
         projectId: Long,
@@ -181,174 +166,94 @@ class ActionRepository @Inject constructor(
         noteDao.delete(note.toEntity())
     }
 
-    // -------------------------------------------------------------------------
-    // Action validity check after project restore
-    // -------------------------------------------------------------------------
+    // ── Validity ──────────────────────────────────────────────────────────────
 
-    // Validate all actions for a project after a restore/reimport.
-    // Checks each file that was modified: does it match the original or
-    // the modified state? Used to determine what needs to be re-applied.
     suspend fun validateActions(projectId: Long): List<ActionValidation> =
         withContext(Dispatchers.IO) {
-            val actions = actionDao.getActionsForProjectOnce(projectId)
-            actions.map { entity ->
+            actionDao.getActionsForProjectOnce(projectId).map { entity ->
                 val action = entity.toActionRecord()
-                val validity = computeValidity(action)
-                ActionValidation(
-                    action = action,
-                    validity = validity.first,
-                    explanation = validity.second
-                )
+                val (validity, explanation) = computeValidity(action)
+                ActionValidation(action, validity, explanation)
             }
         }
 
     private fun computeValidity(action: ActionRecord): Pair<ActionValidity, String> {
-        if (action.changedFiles.isEmpty()) {
-            return Pair(
-                ActionValidity.NOT_APPLICABLE,
-                "No file changes recorded for this action"
-            )
-        }
+        if (action.changedFiles.isEmpty())
+            return ActionValidity.NOT_APPLICABLE to "No file changes recorded"
 
-        var allMatch = true
-        var allOriginal = true
-        var anyMissing = false
-        var anyChanged = false
+        var allMatch = true; var allOriginal = true
+        var anyMissing = false; var anyChanged = false
 
         for (snapshot in action.changedFiles) {
             val file = File(snapshot.filePath)
-
-            when {
-                !file.exists() -> {
-                    anyMissing = true
-                    allMatch = false
-                    allOriginal = false
-                }
-                else -> {
-                    val currentHash = FileUtil.sha256(file.readText())
-                    val matchesModified = currentHash == snapshot.modifiedHash
-                    val matchesOriginal = currentHash == snapshot.originalHash
-
-                    if (!matchesModified) allMatch = false
-                    if (!matchesOriginal) allOriginal = false
-                    if (!matchesModified && !matchesOriginal) anyChanged = true
-                }
+            if (!file.exists()) {
+                anyMissing = true; allMatch = false; allOriginal = false
+            } else {
+                val h = FileUtil.sha256(file.readText())
+                if (h != snapshot.modifiedHash) allMatch = false
+                if (h != snapshot.originalHash) allOriginal = false
+                if (h != snapshot.modifiedHash && h != snapshot.originalHash) anyChanged = true
             }
         }
 
         return when {
             anyMissing && action.changedFiles.all { !File(it.filePath).exists() } ->
-                Pair(
-                    ActionValidity.NOT_APPLICABLE,
-                    "All target files no longer exist on this device"
-                )
-
+                ActionValidity.NOT_APPLICABLE to "All target files no longer exist"
             anyMissing ->
-                Pair(
-                    ActionValidity.PARTIALLY_APPLICABLE,
-                    "Some target files are missing — manual review required"
-                )
-
+                ActionValidity.PARTIALLY_APPLICABLE to "Some target files are missing"
             allMatch ->
-                Pair(
-                    ActionValidity.ALREADY_APPLIED,
-                    "All files already match the modified state"
-                )
-
+                ActionValidity.ALREADY_APPLIED to "All files match modified state"
             allOriginal ->
-                Pair(
-                    ActionValidity.NEEDS_REAPPLY,
-                    "Files match original state — safe to re-apply"
-                )
-
+                ActionValidity.NEEDS_REAPPLY to "Files match original state — safe to re-apply"
             anyChanged ->
-                Pair(
-                    ActionValidity.PARTIALLY_APPLICABLE,
-                    "Files have changed since this action — manual review required"
-                )
-
+                ActionValidity.PARTIALLY_APPLICABLE to "Files changed — manual review required"
             else ->
-                Pair(
-                    ActionValidity.PARTIALLY_APPLICABLE,
-                    "Mixed state detected — manual review required"
-                )
+                ActionValidity.PARTIALLY_APPLICABLE to "Mixed state — manual review required"
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Mappers
-    // -------------------------------------------------------------------------
+    // ── Mappers ───────────────────────────────────────────────────────────────
 
     private fun ProjectEntity.toProject() = Project(
-        id = id,
-        name = name,
-        sourceDevice = sourceDevice,
-        targetDevice = targetDevice,
-        sourceRom = sourceRom,
-        targetRom = targetRom,
+        id = id, name = name,
+        sourceDevice = sourceDevice, targetDevice = targetDevice,
+        sourceRom = sourceRom, targetRom = targetRom,
         projectFolderPath = projectFolderPath,
-        createdAt = createdAt,
-        lastModified = lastModified,
-        status = status
+        createdAt = createdAt, lastModified = lastModified,
+        status = status,
+        oemPath = oemPath, aospPath = aospPath, workPath = workPath,
+        mappingVersion = mappingVersion, activeMode = activeMode
     )
 
     private fun Project.toEntity() = ProjectEntity(
-        id = id,
-        name = name,
-        sourceDevice = sourceDevice,
-        targetDevice = targetDevice,
-        sourceRom = sourceRom,
-        targetRom = targetRom,
+        id = id, name = name,
+        sourceDevice = sourceDevice, targetDevice = targetDevice,
+        sourceRom = sourceRom, targetRom = targetRom,
         projectFolderPath = projectFolderPath,
-        createdAt = createdAt,
-        lastModified = lastModified,
-        status = status
+        createdAt = createdAt, lastModified = lastModified,
+        status = status,
+        oemPath = oemPath, aospPath = aospPath, workPath = workPath,
+        mappingVersion = mappingVersion, activeMode = activeMode
     )
 
     private fun ActionEntity.toActionRecord(): ActionRecord {
-        val changedFiles = try {
-            json.decodeFromString<List<FileSnapshot>>(changedFilesJson)
-        } catch (e: Exception) { emptyList() }
-
-        val metadata = try {
-            json.decodeFromString<Map<String, String>>(metadataJson)
-        } catch (e: Exception) { emptyMap() }
-
-        return ActionRecord(
-            id = id,
-            projectId = projectId,
-            type = type,
-            description = description,
-            timestamp = timestamp,
-            backupZipPath = backupZipPath,
-            changedFiles = changedFiles,
-            undone = undone,
-            undoneAt = undoneAt,
-            metadata = metadata
-        )
+        val changedFiles = try { json.decodeFromString<List<FileSnapshot>>(changedFilesJson) }
+                          catch (e: Exception) { emptyList() }
+        val metadata     = try { json.decodeFromString<Map<String, String>>(metadataJson) }
+                          catch (e: Exception) { emptyMap() }
+        return ActionRecord(id, projectId, type, description, timestamp,
+            backupZipPath, changedFiles, undone, undoneAt, metadata)
     }
 
     private fun NoteEntity.toProjectNote(): ProjectNote {
-        val tags = try {
-            json.decodeFromString<List<String>>(tagsJson)
-        } catch (e: Exception) { emptyList() }
-
-        return ProjectNote(
-            id = id,
-            projectId = projectId,
-            actionId = actionId,
-            content = content,
-            timestamp = timestamp,
-            tags = tags
-        )
+        val tags = try { json.decodeFromString<List<String>>(tagsJson) }
+                   catch (e: Exception) { emptyList() }
+        return ProjectNote(id, projectId, actionId, content, timestamp, tags)
     }
 
     private fun ProjectNote.toEntity() = NoteEntity(
-        id = id,
-        projectId = projectId,
-        actionId = actionId,
-        content = content,
-        timestamp = timestamp,
+        id = id, projectId = projectId, actionId = actionId,
+        content = content, timestamp = timestamp,
         tagsJson = json.encodeToString(tags)
     )
 }
