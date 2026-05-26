@@ -161,7 +161,7 @@ fun ConflictsScreen(
 @Composable
 private fun SummaryCard(label: String, count: Int, color: androidx.compose.ui.graphics.Color) {
     Card(
-        modifier = weight(1f),
+        modifier = Modifier.weight(1f),
         colors = CardDefaults.cardColors(
             containerColor = color.copy(alpha = 0.1f)
         )
