@@ -3,6 +3,7 @@ package com.selinuxtoolbox.feature.contextdiff
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.selinuxtoolbox.core.data.prefs.AppPreferences
+import com.selinuxtoolbox.core.domain.usecase.FullComparisonResult
 import com.selinuxtoolbox.core.domain.usecase.FullComparisonUseCase
 import com.selinuxtoolbox.core.domain.usecase.GenerateMissingContextsUseCase
 import com.selinuxtoolbox.core.domain.usecase.GetActiveProjectUseCase
@@ -112,27 +113,30 @@ class ContextDiffViewModel @Inject constructor(
                     aospPath = state.aospPath,
                     workPath = state.workPath
                 )
-                if (result is FullComparisonResult.SetupError) {
-                    _uiState.update { it.copy(step = ContextDiffStep.Error(result.reason)) }
-                    return@launch
-                }
-                val success = result as FullComparisonResult.Success
-                val missingEntries = success.report.missingContextEntries.map { entry ->
-                    ContextDiffEntry(
-                        id = UUID.randomUUID().toString(),
-                        pattern = entry.pattern,
-                        context = entry.context,
-                        type = entry.type,
-                        fileType = ContextFileType.valueOf(entry.fileType),
-                        partition = entry.partition,
-                        oemSourceFile = entry.oemSourceFile
-                    )
-                }
-                _uiState.update {
-                    it.copy(
-                        step = ContextDiffStep.Results(missingEntries),
-                        acceptedIds = emptySet()
-                    )
+                when (result) {
+                    is FullComparisonResult.SetupError -> {
+                        _uiState.update { it.copy(step = ContextDiffStep.Error(result.reason)) }
+                        _events.emit(ContextDiffEvent.Error(result.reason))
+                    }
+                    is FullComparisonResult.Success -> {
+                        val missingEntries = result.report.missingContextEntries.map { entry ->
+                            ContextDiffEntry(
+                                id = UUID.randomUUID().toString(),
+                                pattern = entry.pattern,
+                                context = entry.context,
+                                type = entry.type,
+                                fileType = ContextFileType.valueOf(entry.fileType),
+                                partition = entry.partition,
+                                oemSourceFile = entry.oemSourceFile
+                            )
+                        }
+                        _uiState.update {
+                            it.copy(
+                                step = ContextDiffStep.Results(missingEntries),
+                                acceptedIds = emptySet()
+                            )
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(step = ContextDiffStep.Error(e.message ?: "Comparison failed")) }

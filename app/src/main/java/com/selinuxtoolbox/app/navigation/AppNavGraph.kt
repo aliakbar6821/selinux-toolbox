@@ -12,6 +12,7 @@ import com.selinuxtoolbox.feature.contexts.CONTEXTS_ROUTE
 import com.selinuxtoolbox.feature.contexts.contextsScreen
 import com.selinuxtoolbox.feature.contextdiff.CONTEXT_DIFF_ROUTE
 import com.selinuxtoolbox.feature.contextdiff.contextDiffScreen
+import com.selinuxtoolbox.feature.contextdiff.navigateToContextDiff
 import com.selinuxtoolbox.feature.dashboard.DASHBOARD_ROUTE
 import com.selinuxtoolbox.feature.dashboard.dashboardScreen
 import com.selinuxtoolbox.feature.denials.denialsScreen
