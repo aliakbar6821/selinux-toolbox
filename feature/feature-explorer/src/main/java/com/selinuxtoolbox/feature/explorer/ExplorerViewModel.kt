@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -58,8 +58,8 @@ class ExplorerViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSearching = true) }
 
-            // Get project paths from preferences – for now use defaults
-            val outputPath = appPreferences.outputFolderPath.first()
+            // Get project paths from preferences – use firstOrNull() to avoid suspend function confusion
+            val outputPath = appPreferences.outputFolderPath.firstOrNull() ?: "/sdcard/SELinuxToolbox"
             val oemPath = "$outputPath/OEM"
             val aospPath = "$outputPath/AOSP"
 
@@ -82,7 +82,7 @@ class ExplorerViewModel @Inject constructor(
         if (result !is ManualSearchResult.Found) return
 
         val typeName = result.result.typeName
-        val workPath = appPreferences.outputFolderPath.first()
+        val workPath = appPreferences.outputFolderPath.firstOrNull() ?: "/sdcard/SELinuxToolbox"
 
         viewModelScope.launch {
             val generateResult = manualTypeSearchUseCase.generateFix(
