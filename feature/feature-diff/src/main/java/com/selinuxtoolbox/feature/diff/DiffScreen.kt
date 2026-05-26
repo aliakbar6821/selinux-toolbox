@@ -54,7 +54,7 @@ fun DiffScreen(
                 is DiffStep.NoOutputs ->
                     CenteredMessage(
                         "No generated CIL files found in:\n${step.workPath}/outputs/\n\n" +
-                        "Run the diff or cleanup step first to generate additions."
+                        "Run the cleanup or diff step first to generate additions."
                     )
 
                 is DiffStep.Error ->
@@ -97,35 +97,35 @@ private fun ReadyContent(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(Modifier.height(6.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item { SummaryChip("${report.addedTypes.size} types",      MaterialTheme.colorScheme.tertiary) }
-                    item { SummaryChip("${report.addedAttributes.size + report.addedAttributeSets.size} attrs", MaterialTheme.colorScheme.secondary) }
-                    item { SummaryChip("${report.addedRules.size} rules",       MaterialTheme.colorScheme.primary) }
-                    item { SummaryChip("${report.addedContextEntries.size} ctx", MaterialTheme.colorScheme.onSurfaceVariant) }
-                    item {
-                        Text(
-                            "· ${report.generatedFileCount} files scanned",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.align(Alignment.CenterVertically)
-                        )
-                    }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    SummaryChip("${report.addedTypes.size} types",      MaterialTheme.colorScheme.tertiary)
+                    SummaryChip("${report.addedAttributes.size + report.addedAttributeSets.size} attrs", MaterialTheme.colorScheme.secondary)
+                    SummaryChip("${report.addedRules.size} rules",      MaterialTheme.colorScheme.primary)
+                    SummaryChip("${report.addedContextEntries.size} ctx", MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "· ${report.generatedFileCount} files",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
 
         // Filter chips
         LazyRow(
-            modifier            = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier              = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(DiffFilter.values()) { filter ->
                 val count = when (filter) {
-                    DiffFilter.ALL       -> report.totalAdditions
-                    DiffFilter.TYPES     -> report.addedTypes.size
-                    DiffFilter.ATTRIBUTES-> report.addedAttributes.size + report.addedAttributeSets.size
-                    DiffFilter.RULES     -> report.addedRules.size
-                    DiffFilter.CONTEXTS  -> report.addedContextEntries.size
+                    DiffFilter.ALL        -> report.totalAdditions
+                    DiffFilter.TYPES      -> report.addedTypes.size
+                    DiffFilter.ATTRIBUTES -> report.addedAttributes.size + report.addedAttributeSets.size
+                    DiffFilter.RULES      -> report.addedRules.size
+                    DiffFilter.CONTEXTS   -> report.addedContextEntries.size
                 }
                 FilterChip(
                     selected = activeFilter == filter,
@@ -140,13 +140,12 @@ private fun ReadyContent(
             return@Column
         }
 
-        // Lines list
+        // Lines list grouped by source file
         LazyColumn(
             modifier       = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Group by source file
             val grouped = visibleLines.groupBy { it.sourceFile }
             grouped.forEach { (fileName, lines) ->
                 item(key = "header_$fileName") {
@@ -180,7 +179,6 @@ private fun DiffLineCard(line: DiffLine) {
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Line number badge
         Text(
             "${line.lineNumber}",
             style    = MaterialTheme.typography.labelSmall,
@@ -188,7 +186,6 @@ private fun DiffLineCard(line: DiffLine) {
             modifier = Modifier.width(36.dp),
             fontSize = 10.sp
         )
-        // CIL content
         Text(
             line.content,
             style      = MaterialTheme.typography.bodySmall,
