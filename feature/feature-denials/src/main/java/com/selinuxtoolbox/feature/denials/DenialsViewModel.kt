@@ -75,15 +75,11 @@ class DenialsViewModel @Inject constructor(
     }
 
     private suspend fun loadProject() {
-        // GetActiveProjectUseCase returns Flow<Project?> — collect first emission
         val project = getActiveProject().first() ?: run {
             _uiState.update { it.copy(step = DenialsStep.NoProject) }
             return
         }
 
-        // Project (old model) uses projectFolderPath as workPath.
-        // oemPath / aospPath added in recent steps — use them if non-empty,
-        // otherwise fall back to projectFolderPath so old projects still work.
         val resolvedAospPath = if (project.aospPath.isNotEmpty()) project.aospPath
                                else project.projectFolderPath
         val resolvedWorkPath = if (project.workPath.isNotEmpty()) project.workPath
@@ -107,7 +103,12 @@ class DenialsViewModel @Inject constructor(
 
             val state = _uiState.value
             val tempFile = uriToTempFile(uri) ?: run {
-                _uiState.update { it.copy(step = DenialsStep.Error("Cannot read selected file")) }
+                _uiState.update {
+                    it.copy(step = DenialsStep.Error(
+                        "Cannot read selected file.\n" +
+                        "Try copying the log to /sdcard/Download first, then pick it from there."
+                    ))
+                }
                 return@launch
             }
 
@@ -216,15 +217,34 @@ class DenialsViewModel @Inject constructor(
     private fun groupKey(g: DenialGroup) =
         "${g.sourceDomain}::${g.targetType}::${g.objectClass}"
 
+    /**
+     * Convert a content URI to a temp File.
+     *
+     * uri.lastPathSegment for content:// URIs can be something like
+     * "document/primary:Download/boot.log" — the slash makes File() create
+     * nested dirs instead of a single file, which then fails.
+     * We sanitize by keeping only the final path component and replacing
+     * any remaining illegal characters.
+     */
     private fun uriToTempFile(uri: Uri): File? {
         return try {
             val ctx    = getApplication<Application>()
             val stream = ctx.contentResolver.openInputStream(uri) ?: return null
-            val name   = uri.lastPathSegment ?: "imported_log.txt"
-            val tmp    = File(ctx.cacheDir, "log_import_$name")
+
+            // Extract safe filename from the URI
+            val rawSegment  = uri.lastPathSegment ?: "imported_log.txt"
+            val safeName    = rawSegment
+                .substringAfterLast('/')   // strip path prefix like "primary:Download/"
+                .substringAfterLast(':')   // strip storage prefix like "primary:"
+                .replace(Regex("[^a-zA-Z0-9._\\-]"), "_")
+                .ifBlank { "imported_log.txt" }
+
+            val tmp = File(ctx.cacheDir, "log_import_$safeName")
             tmp.outputStream().use { out -> stream.copyTo(out) }
             stream.close()
             tmp
-        } catch (e: Exception) { null }
+        } catch (e: Exception) {
+            null
+        }
     }
 }

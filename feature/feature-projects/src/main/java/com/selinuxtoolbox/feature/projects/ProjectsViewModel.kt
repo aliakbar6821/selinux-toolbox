@@ -15,6 +15,7 @@ import com.selinuxtoolbox.core.domain.usecase.SetActiveProjectUseCase
 import com.selinuxtoolbox.core.domain.usecase.ValidateActionsUseCase
 import com.selinuxtoolbox.core.model.ActionRecord
 import com.selinuxtoolbox.core.model.ActionValidation
+import com.selinuxtoolbox.core.model.ActiveMode
 import com.selinuxtoolbox.core.model.Project
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -50,6 +51,9 @@ data class CreateProjectFormState(
     val targetDevice: String = "",
     val sourceRom: String = "",
     val targetRom: String = "",
+    val mode: ActiveMode = ActiveMode.OFFLINE,
+    // Dialog flow: user fills name → mode dialog → submitting
+    val showModeDialog: Boolean = false,
     val nameError: String? = null,
     val isSubmitting: Boolean = false
 )
@@ -78,17 +82,13 @@ class ProjectsViewModel @Inject constructor(
     private val appPreferences: AppPreferences
 ) : ViewModel() {
 
-    // -------------------------------------------------------------------------
-    // UI State
-    // -------------------------------------------------------------------------
-
-    private val _uiState = MutableStateFlow(ProjectsUiState())
+    private val _uiState    = MutableStateFlow(ProjectsUiState())
     val uiState: StateFlow<ProjectsUiState> = _uiState.asStateFlow()
 
     private val _detailState = MutableStateFlow(ProjectDetailUiState())
     val detailState: StateFlow<ProjectDetailUiState> = _detailState.asStateFlow()
 
-    private val _formState = MutableStateFlow(CreateProjectFormState())
+    private val _formState  = MutableStateFlow(CreateProjectFormState())
     val formState: StateFlow<CreateProjectFormState> = _formState.asStateFlow()
 
     private val _events = MutableSharedFlow<ProjectsEvent>()
@@ -96,41 +96,31 @@ class ProjectsViewModel @Inject constructor(
 
     val outputPath: StateFlow<String> = appPreferences.outputFolderPath
         .stateIn(
-            scope = viewModelScope,
+            scope   = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = "/sdcard/SELinuxToolbox"
         )
 
-    init {
-        observeProjects()
-    }
+    init { observeProjects() }
 
-    // -------------------------------------------------------------------------
-    // Observe all projects
-    // -------------------------------------------------------------------------
+    // ── Observe ───────────────────────────────────────────────────────────────
 
     private fun observeProjects() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             getAllProjectsUseCase().collect { projects ->
-                _uiState.update {
-                    it.copy(projects = projects, isLoading = false, error = null)
-                }
+                _uiState.update { it.copy(projects = projects, isLoading = false, error = null) }
             }
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Project detail
-    // -------------------------------------------------------------------------
+    // ── Detail ────────────────────────────────────────────────────────────────
 
     fun loadProjectDetail(project: Project) {
         _detailState.update { it.copy(project = project, isLoading = true) }
         viewModelScope.launch {
             getProjectActionsUseCase(project.id).collect { actions ->
-                _detailState.update {
-                    it.copy(actions = actions, isLoading = false)
-                }
+                _detailState.update { it.copy(actions = actions, isLoading = false) }
             }
         }
     }
@@ -139,15 +129,11 @@ class ProjectsViewModel @Inject constructor(
         viewModelScope.launch {
             _detailState.update { it.copy(isLoadingValidations = true) }
             val validations = validateActionsUseCase(projectId)
-            _detailState.update {
-                it.copy(validations = validations, isLoadingValidations = false)
-            }
+            _detailState.update { it.copy(validations = validations, isLoadingValidations = false) }
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Form field updates
-    // -------------------------------------------------------------------------
+    // ── Form field updates ────────────────────────────────────────────────────
 
     fun onNameChange(value: String) =
         _formState.update { it.copy(name = value, nameError = null) }
@@ -166,11 +152,13 @@ class ProjectsViewModel @Inject constructor(
 
     fun resetForm() = _formState.update { CreateProjectFormState() }
 
-    // -------------------------------------------------------------------------
-    // Create project
-    // -------------------------------------------------------------------------
+    // ── Create flow ───────────────────────────────────────────────────────────
 
-    fun submitCreateProject() {
+    /**
+     * Called when user taps "Create" on the form.
+     * Validates name, then shows the OFFLINE / LIVE mode picker dialog.
+     */
+    fun onRequestCreate() {
         val form = _formState.value
         if (form.name.isBlank()) {
             _formState.update { it.copy(nameError = "Project name is required") }
@@ -180,20 +168,36 @@ class ProjectsViewModel @Inject constructor(
             it.name.equals(form.name.trim(), ignoreCase = true)
         }
         if (duplicate) {
-            _formState.update {
-                it.copy(nameError = "A project with this name already exists")
-            }
+            _formState.update { it.copy(nameError = "A project with this name already exists") }
             return
         }
+        // Show mode dialog
+        _formState.update { it.copy(showModeDialog = true, nameError = null) }
+    }
+
+    /** Called when user picks OFFLINE or LIVE in the mode dialog. */
+    fun onModeSelected(mode: ActiveMode) {
+        _formState.update { it.copy(mode = mode, showModeDialog = false) }
+        submitCreateProject()
+    }
+
+    /** Dismiss the mode dialog without creating. */
+    fun onModeDismissed() {
+        _formState.update { it.copy(showModeDialog = false) }
+    }
+
+    private fun submitCreateProject() {
+        val form = _formState.value
         viewModelScope.launch {
             _formState.update { it.copy(isSubmitting = true) }
             val result = createProjectUseCase(
-                name = form.name.trim(),
-                sourceDevice = form.sourceDevice.trim(),
-                targetDevice = form.targetDevice.trim(),
-                sourceRom = form.sourceRom.trim(),
-                targetRom = form.targetRom.trim(),
-                outputBasePath = outputPath.value
+                name           = form.name.trim(),
+                sourceDevice   = form.sourceDevice.trim(),
+                targetDevice   = form.targetDevice.trim(),
+                sourceRom      = form.sourceRom.trim(),
+                targetRom      = form.targetRom.trim(),
+                outputBasePath = outputPath.value,
+                mode           = form.mode
             )
             result.fold(
                 onSuccess = { projectId ->
@@ -201,116 +205,67 @@ class ProjectsViewModel @Inject constructor(
                     _events.emit(ProjectsEvent.ProjectCreated(projectId))
                 },
                 onFailure = { e ->
-                    _events.emit(
-                        ProjectsEvent.Error(e.message ?: "Failed to create project")
-                    )
+                    _events.emit(ProjectsEvent.Error(e.message ?: "Failed to create project"))
                 }
             )
             _formState.update { it.copy(isSubmitting = false) }
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Delete project
-    // Public function named onDeleteProject to avoid collision with
-    // injected deleteProjectUseCase property
-    // -------------------------------------------------------------------------
+    // ── Delete ────────────────────────────────────────────────────────────────
 
     fun onDeleteProject(project: Project) {
         viewModelScope.launch {
-            val result = deleteProjectUseCase(project.id)
-            result.fold(
-                onSuccess = {
-                    _events.emit(ProjectsEvent.ProjectDeleted(project.name))
-                },
-                onFailure = { e ->
-                    _events.emit(
-                        ProjectsEvent.Error(e.message ?: "Failed to delete project")
-                    )
-                }
+            deleteProjectUseCase(project.id).fold(
+                onSuccess = { _events.emit(ProjectsEvent.ProjectDeleted(project.name)) },
+                onFailure = { e -> _events.emit(ProjectsEvent.Error(e.message ?: "Failed to delete project")) }
             )
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Archive project
-    // -------------------------------------------------------------------------
+    // ── Archive ───────────────────────────────────────────────────────────────
 
     fun onArchiveProject(projectId: Long) {
         viewModelScope.launch {
-            val result = archiveProjectUseCase(projectId)
-            result.fold(
+            archiveProjectUseCase(projectId).fold(
                 onSuccess = {},
-                onFailure = { e ->
-                    _events.emit(
-                        ProjectsEvent.Error(e.message ?: "Failed to archive project")
-                    )
-                }
+                onFailure = { e -> _events.emit(ProjectsEvent.Error(e.message ?: "Failed to archive project")) }
             )
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Set active project
-    // -------------------------------------------------------------------------
+    // ── Set active ────────────────────────────────────────────────────────────
 
     fun onSetActiveProject(projectId: Long) {
         viewModelScope.launch {
-            val result = setActiveProjectUseCase(projectId)
-            result.fold(
-                onSuccess = {
-                    _events.emit(ProjectsEvent.ActiveProjectSet(projectId))
-                },
-                onFailure = { e ->
-                    _events.emit(
-                        ProjectsEvent.Error(e.message ?: "Failed to set active project")
-                    )
-                }
+            setActiveProjectUseCase(projectId).fold(
+                onSuccess = { _events.emit(ProjectsEvent.ActiveProjectSet(projectId)) },
+                onFailure = { e -> _events.emit(ProjectsEvent.Error(e.message ?: "Failed to set active project")) }
             )
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Export project
-    // -------------------------------------------------------------------------
+    // ── Export / Import ───────────────────────────────────────────────────────
 
     fun onExportProject(projectId: Long) {
         viewModelScope.launch {
-            val exportsDir = "${outputPath.value}/exports"
-            val result = exportProjectUseCase(projectId, exportsDir)
-            result.fold(
-                onSuccess = { zipPath ->
-                    _events.emit(ProjectsEvent.ExportSuccess(zipPath))
-                },
-                onFailure = { e ->
-                    _events.emit(ProjectsEvent.Error(e.message ?: "Export failed"))
-                }
+            exportProjectUseCase(projectId, "${outputPath.value}/exports").fold(
+                onSuccess = { zipPath -> _events.emit(ProjectsEvent.ExportSuccess(zipPath)) },
+                onFailure = { e -> _events.emit(ProjectsEvent.Error(e.message ?: "Export failed")) }
             )
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Import project
-    // -------------------------------------------------------------------------
 
     fun onImportProject(zipPath: String) {
         viewModelScope.launch {
-            val projectsDir = "${outputPath.value}/projects"
-            val result = importProjectUseCase(zipPath, projectsDir)
-            result.fold(
-                onSuccess = { projectId ->
-                    _events.emit(ProjectsEvent.ImportSuccess(projectId))
-                },
-                onFailure = { e ->
-                    _events.emit(ProjectsEvent.Error(e.message ?: "Import failed"))
-                }
+            importProjectUseCase(zipPath, "${outputPath.value}/projects").fold(
+                onSuccess = { projectId -> _events.emit(ProjectsEvent.ImportSuccess(projectId)) },
+                onFailure = { e -> _events.emit(ProjectsEvent.Error(e.message ?: "Import failed")) }
             )
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Add note
-    // -------------------------------------------------------------------------
+    // ── Notes ─────────────────────────────────────────────────────────────────
 
     fun onAddNote(
         projectId: Long,
@@ -319,14 +274,9 @@ class ProjectsViewModel @Inject constructor(
         actionId: Long? = null
     ) {
         viewModelScope.launch {
-            val result = addNoteUseCase(projectId, content, tags, actionId)
-            result.fold(
+            addNoteUseCase(projectId, content, tags, actionId).fold(
                 onSuccess = {},
-                onFailure = { e ->
-                    _events.emit(
-                        ProjectsEvent.Error(e.message ?: "Failed to add note")
-                    )
-                }
+                onFailure = { e -> _events.emit(ProjectsEvent.Error(e.message ?: "Failed to add note")) }
             )
         }
     }
