@@ -19,7 +19,7 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.ClearAll
-import androidx.compose.material.icons.filled.Diff
+import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
@@ -384,7 +384,7 @@ private fun QuickActionsRow(
         )
         QuickActionCard(
             modifier = Modifier.weight(1f),
-            icon = Icons.Default.Diff,
+            icon = Icons.Default.CompareArrows,
             label = "Context\nDiff",
             onClick = onNavigateToContextDiff
         )
