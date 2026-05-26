@@ -83,6 +83,7 @@ dependencies {
     implementation(project(":feature:feature-offline"))
     implementation(project(":feature:feature-conflicts"))
     implementation(project(":feature:feature-validator"))
+    implementation(project(":feature:feature-contextdiff"))   // ← ADD THIS LINE
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.compose.bom))
