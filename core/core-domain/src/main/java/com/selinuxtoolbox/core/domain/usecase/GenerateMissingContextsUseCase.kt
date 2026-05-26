@@ -3,6 +3,8 @@ package com.selinuxtoolbox.core.domain.usecase
 import com.selinuxtoolbox.core.data.util.FileUtil
 import com.selinuxtoolbox.core.domain.analyzer.CilGenerator
 import com.selinuxtoolbox.core.domain.analyzer.OutputFileInstruction
+import com.selinuxtoolbox.core.domain.analyzer.SafetyConfig
+import com.selinuxtoolbox.core.domain.analyzer.TypeSafety
 import com.selinuxtoolbox.core.domain.parser.ContextFileParser
 import com.selinuxtoolbox.core.domain.path.PathResolver
 import com.selinuxtoolbox.core.domain.path.PolicyPartition
