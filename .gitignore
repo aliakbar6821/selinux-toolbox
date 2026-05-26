@@ -30,6 +30,3 @@ keystore.properties
 # OS
 Thumbs.db
 
-# ARM64 native binaries — placed in assets at build time
-app/src/main/assets/bin/secilc
-app/src/main/assets/bin/sepolicy-analyze
