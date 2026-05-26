@@ -55,17 +55,15 @@ jobs:
             build-essential --no-install-recommends
 
       - name: Restore cached NDK
-        if: steps.cache-binaries.outputs.cache-hit != 'true'
         id: cache-ndk
+        if: steps.cache-binaries.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: ~/android-ndk
           key: ndk-${{ env.NDK_VERSION }}-linux-v2
 
       - name: Download Android NDK
-        if: |
-          steps.cache-binaries.outputs.cache-hit != 'true' &&
-          steps.cache-ndk.outputs.cache-hit != 'true'
+        if: steps.cache-binaries.outputs.cache-hit != 'true' && steps.cache-ndk.outputs.cache-hit != 'true'
         run: |
           wget -q \
             "https://dl.google.com/android/repository/android-ndk-${{ env.NDK_VERSION }}-linux.zip" \
