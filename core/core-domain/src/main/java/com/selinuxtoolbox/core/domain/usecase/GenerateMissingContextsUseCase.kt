@@ -93,7 +93,8 @@ class GenerateMissingContextsUseCase @Inject constructor(
                 val cilFile = File(outDir, "${partition.dirName}_sepolicy.cil")
                 cilFile.writeText(cilSb.toString())
 
-                val firstEntryFileType = entries.first().fileType
+                // 🔥 FIX: Convert String to ContextFileType enum
+                val firstEntryFileType = ContextFileType.valueOf(entries.first().fileType)
                 val contextFileName = when (firstEntryFileType) {
                     ContextFileType.FILE -> "${partition.dirName}_file_contexts"
                     ContextFileType.PROPERTY -> "${partition.dirName}_property_contexts"
