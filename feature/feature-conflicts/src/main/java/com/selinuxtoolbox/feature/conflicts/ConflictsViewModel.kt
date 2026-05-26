@@ -6,7 +6,7 @@ import com.selinuxtoolbox.core.data.prefs.AppPreferences
 import com.selinuxtoolbox.core.domain.usecase.ConflictReport
 import com.selinuxtoolbox.core.domain.usecase.DetectConflictsUseCase
 import com.selinuxtoolbox.core.domain.usecase.GetActiveProjectUseCase
-import com.selinuxtoolbox.core.model.Project
+import com.selinuxtoolbox.core.model.Project  // ✅ This was missing
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -161,7 +161,7 @@ fun ConflictsScreen(
 @Composable
 private fun SummaryCard(label: String, count: Int, color: androidx.compose.ui.graphics.Color) {
     Card(
-        modifier = Modifier.weight(1f),
+        modifier = Modifier.weight(1f),  // ✅ Correct usage – Modifier.weight, not weight()
         colors = CardDefaults.cardColors(
             containerColor = color.copy(alpha = 0.1f)
         )
@@ -218,7 +218,7 @@ private fun ConflictCard(conflict: Conflict) {
                 Text(
                     conflict.description,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f)  // ✅ Correct
                 )
                 SeverityChip(severity = conflict.severity)
             }
