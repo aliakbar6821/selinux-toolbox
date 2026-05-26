@@ -174,10 +174,10 @@ private fun SearchResultContent(
         }
 
         // OEM declaration
-        if (result.oemDeclaration != null) {
+        result.oemDeclaration?.let { oemDecl ->
             item {
                 Text("OEM declaration:", style = MaterialTheme.typography.titleSmall)
-                CodeBlock(result.oemDeclaration)  // now safe because we checked != null
+                CodeBlock(oemDecl)
             }
         }
 

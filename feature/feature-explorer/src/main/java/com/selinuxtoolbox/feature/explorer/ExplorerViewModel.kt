@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -57,8 +58,8 @@ class ExplorerViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSearching = true) }
 
-            // Use .value on StateFlow – no suspend needed
-            val outputPath = appPreferences.outputFolderPath.value
+            // Use first() to get the current value of the Flow
+            val outputPath = appPreferences.outputFolderPath.first()
             val oemPath = "$outputPath/OEM"
             val aospPath = "$outputPath/AOSP"
 
@@ -81,7 +82,7 @@ class ExplorerViewModel @Inject constructor(
         if (result !is ManualSearchResult.Found) return
 
         val typeName = result.result.typeName
-        val workPath = appPreferences.outputFolderPath.value
+        val workPath = appPreferences.outputFolderPath.first()
 
         viewModelScope.launch {
             val generateResult = manualTypeSearchUseCase.generateFix(
