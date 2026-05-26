@@ -6,7 +6,6 @@ import com.selinuxtoolbox.core.data.prefs.AppPreferences
 import com.selinuxtoolbox.core.domain.usecase.ConflictReport
 import com.selinuxtoolbox.core.domain.usecase.DetectConflictsUseCase
 import com.selinuxtoolbox.core.domain.usecase.GetActiveProjectUseCase
-import com.selinuxtoolbox.core.model.Project  // ✅ This was missing
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,8 +53,8 @@ class ConflictsViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val project = getActiveProjectUseCase().first()
-            project?.let {
-                _uiState.update { it.copy(projectName = it.name) }
+            project?.let { p ->
+                _uiState.update { it.copy(projectName = p.name) }
             }
         }
         detectConflicts()

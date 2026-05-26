@@ -1,6 +1,5 @@
 package com.selinuxtoolbox.feature.conflicts
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -91,64 +90,74 @@ fun ConflictsScreen(
                 return@Scaffold
             }
 
-            // Summary cards
+            // Summary cards — weight(1f) applied here in RowScope
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                SummaryCard("Total", report.totalConflicts, MaterialTheme.colorScheme.primary)
-                SummaryCard("Critical", report.criticalCount, CriticalRed)
-                SummaryCard("High", report.highCount, MaterialTheme.colorScheme.error)
-                SummaryCard("Medium", report.mediumCount, MaterialTheme.colorScheme.secondary)
-                SummaryCard("Low", report.lowCount, MaterialTheme.colorScheme.onSurfaceVariant)
+                SummaryCard(
+                    label = "Total",
+                    count = report.totalConflicts,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                SummaryCard(
+                    label = "Critical",
+                    count = report.criticalCount,
+                    color = CriticalRed,
+                    modifier = Modifier.weight(1f)
+                )
+                SummaryCard(
+                    label = "High",
+                    count = report.highCount,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f)
+                )
+                SummaryCard(
+                    label = "Medium",
+                    count = report.mediumCount,
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.weight(1f)
+                )
+                SummaryCard(
+                    label = "Low",
+                    count = report.lowCount,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Conflicts list
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 if (report.duplicateTypes.isNotEmpty()) {
-                    item {
-                        SectionHeader("Duplicate Types (${report.duplicateTypes.size})")
-                    }
+                    item { SectionHeader("Duplicate Types (${report.duplicateTypes.size})") }
                     items(report.duplicateTypes, key = { it.hashCode() }) { conflict ->
                         ConflictCard(conflict)
                     }
                 }
-
                 if (report.duplicateRules.isNotEmpty()) {
-                    item {
-                        SectionHeader("Duplicate Rules (${report.duplicateRules.size})")
-                    }
+                    item { SectionHeader("Duplicate Rules (${report.duplicateRules.size})") }
                     items(report.duplicateRules, key = { it.hashCode() }) { conflict ->
                         ConflictCard(conflict)
                     }
                 }
-
                 if (report.contradictingRules.isNotEmpty()) {
-                    item {
-                        SectionHeader("Contradicting Rules (${report.contradictingRules.size})")
-                    }
+                    item { SectionHeader("Contradicting Rules (${report.contradictingRules.size})") }
                     items(report.contradictingRules, key = { it.hashCode() }) { conflict ->
                         ConflictCard(conflict)
                     }
                 }
-
                 if (report.mappingMismatches.isNotEmpty()) {
-                    item {
-                        SectionHeader("Mapping Mismatches (${report.mappingMismatches.size})")
-                    }
+                    item { SectionHeader("Mapping Mismatches (${report.mappingMismatches.size})") }
                     items(report.mappingMismatches, key = { it.hashCode() }) { conflict ->
                         ConflictCard(conflict)
                     }
                 }
-
                 if (report.missingPlatformTypes.isNotEmpty()) {
-                    item {
-                        SectionHeader("Missing Platform Types (${report.missingPlatformTypes.size})")
-                    }
+                    item { SectionHeader("Missing Platform Types (${report.missingPlatformTypes.size})") }
                     items(report.missingPlatformTypes, key = { it.hashCode() }) { conflict ->
                         ConflictCard(conflict)
                     }
@@ -159,9 +168,14 @@ fun ConflictsScreen(
 }
 
 @Composable
-private fun SummaryCard(label: String, count: Int, color: androidx.compose.ui.graphics.Color) {
+private fun SummaryCard(
+    label: String,
+    count: Int,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier
+) {
     Card(
-        modifier = Modifier.weight(1f),  // ✅ Correct usage – Modifier.weight, not weight()
+        modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = color.copy(alpha = 0.1f)
         )
@@ -218,7 +232,7 @@ private fun ConflictCard(conflict: Conflict) {
                 Text(
                     conflict.description,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.weight(1f)  // ✅ Correct
+                    modifier = Modifier.weight(1f)
                 )
                 SeverityChip(severity = conflict.severity)
             }
