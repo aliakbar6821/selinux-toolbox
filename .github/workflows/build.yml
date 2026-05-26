@@ -6,109 +6,11 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
-    inputs:
-      aosp_tag:
-        description: 'AOSP selinux tag'
-        required: false
-        default: 'android-15.0.0_r1'
-      verbose_build:
-        description: 'Verbose binary build (1=on, 0=off)'
-        required: false
-        default: '0'
-
-env:
-  NDK_VERSION: r27c
-  AOSP_SELINUX_TAG: ${{ github.event.inputs.aosp_tag || 'android-15.0.0_r1' }}
 
 jobs:
-  # ===========================================================================
-  # Job 1: Build ARM64 native binaries
-  # ===========================================================================
-  build-native-binaries:
-    name: Build ARM64 secilc + sepolicy-analyze
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Generate cache key
-        id: cache-key
-        run: |
-          KEY="sepolicy-tools-${{ env.AOSP_SELINUX_TAG }}-ndk-${{ env.NDK_VERSION }}-v7"
-          echo "key=$KEY" >> "$GITHUB_OUTPUT"
-          echo "Cache key: $KEY"
-
-      - name: Restore cached binaries
-        id: cache-binaries
-        uses: actions/cache@v4
-        with:
-          path: app/src/main/assets/bin
-          key: ${{ steps.cache-key.outputs.key }}
-
-      - name: Install build dependencies
-        if: steps.cache-binaries.outputs.cache-hit != 'true'
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y \
-            wget unzip git file flex bison \
-            build-essential --no-install-recommends
-
-      - name: Restore cached NDK
-        id: cache-ndk
-        if: steps.cache-binaries.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: ~/android-ndk
-          key: ndk-${{ env.NDK_VERSION }}-linux-v2
-
-      - name: Download Android NDK
-        if: steps.cache-binaries.outputs.cache-hit != 'true' && steps.cache-ndk.outputs.cache-hit != 'true'
-        run: |
-          wget -q \
-            "https://dl.google.com/android/repository/android-ndk-${{ env.NDK_VERSION }}-linux.zip" \
-            -O /tmp/ndk.zip
-          unzip -q /tmp/ndk.zip -d "$HOME/"
-          mv "$HOME/android-ndk-${{ env.NDK_VERSION }}" "$HOME/android-ndk"
-          rm -f /tmp/ndk.zip
-
-      - name: Build secilc and sepolicy-analyze (ARM64)
-        if: steps.cache-binaries.outputs.cache-hit != 'true'
-        env:
-          NDK_DIR: /home/runner/android-ndk
-          OUTPUT_DIR: ${{ github.workspace }}/app/src/main/assets/bin
-          BUILD_DIR: /tmp/sepolicy_build
-          AOSP_SELINUX_TAG: ${{ env.AOSP_SELINUX_TAG }}
-          NDK_VERSION: ${{ env.NDK_VERSION }}
-          VERBOSE: ${{ github.event.inputs.verbose_build || '0' }}
-        run: |
-          chmod +x scripts/build_sepolicy_tools.sh
-          bash scripts/build_sepolicy_tools.sh
-
-      - name: Verify binaries
-        run: |
-          ls -lh app/src/main/assets/bin/
-          for binary in secilc sepolicy-analyze; do
-            path="app/src/main/assets/bin/$binary"
-            [ -f "$path" ] || { echo "ERROR: $path missing"; exit 1; }
-            file "$path"
-          done
-
-      - name: Upload binaries artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sepolicy-binaries-arm64
-          path: app/src/main/assets/bin/
-          retention-days: 7
-          if-no-files-found: error
-
-  # ===========================================================================
-  # Job 2: Build Android APK
-  # ===========================================================================
   build-apk:
     name: Build Android APK
     runs-on: ubuntu-latest
-    needs: build-native-binaries
 
     steps:
       - name: Checkout repository
@@ -121,15 +23,8 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Download sepolicy binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: sepolicy-binaries-arm64
-          path: app/src/main/assets/bin/
-
       - name: Set binary permissions
         run: |
-          ls -lh app/src/main/assets/bin/
           chmod +x app/src/main/assets/bin/secilc
           chmod +x app/src/main/assets/bin/sepolicy-analyze
 
@@ -178,9 +73,6 @@ jobs:
       - name: Print APK sizes
         run: find app/build/outputs/apk -name "*.apk" -exec du -sh {} \;
 
-  # ===========================================================================
-  # Job 3: Release on version tag
-  # ===========================================================================
   release:
     name: Create Release
     runs-on: ubuntu-latest
