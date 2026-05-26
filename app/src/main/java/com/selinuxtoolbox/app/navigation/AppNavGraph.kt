@@ -6,6 +6,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.selinuxtoolbox.feature.cleanup.cleanupScreen
 import com.selinuxtoolbox.feature.compile.compileScreen
+import com.selinuxtoolbox.feature.conflicts.CONFLICTS_ROUTE
+import com.selinuxtoolbox.feature.conflicts.conflictsScreen
 import com.selinuxtoolbox.feature.contexts.CONTEXTS_ROUTE
 import com.selinuxtoolbox.feature.contexts.contextsScreen
 import com.selinuxtoolbox.feature.dashboard.DASHBOARD_ROUTE
@@ -52,6 +54,6 @@ fun AppNavGraph() {
 
         contextsScreen()
 
-        composable("conflicts") { androidx.compose.material3.Text("Conflicts — coming soon") }
+        conflictsScreen()
     }
 }

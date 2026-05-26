@@ -24,6 +24,7 @@ import com.selinuxtoolbox.core.domain.usecase.ArchiveProjectUseCase
 import com.selinuxtoolbox.core.domain.usecase.CompilePolicyUseCase
 import com.selinuxtoolbox.core.domain.usecase.CreateProjectUseCase
 import com.selinuxtoolbox.core.domain.usecase.DeleteProjectUseCase
+import com.selinuxtoolbox.core.domain.usecase.DetectConflictsUseCase
 import com.selinuxtoolbox.core.domain.usecase.DiffPolicyUseCase
 import com.selinuxtoolbox.core.domain.usecase.ExportProjectUseCase
 import com.selinuxtoolbox.core.domain.usecase.FixMissingAttributesUseCase
@@ -136,6 +137,11 @@ object DomainModule {
     ): ManualTypeSearchUseCase = ManualTypeSearchUseCase(
         pathResolver, contextFileParser, rcFileParser
     )
+
+    @Provides @Singleton
+    fun provideDetectConflictsUseCase(
+        pathResolver: PathResolver
+    ): DetectConflictsUseCase = DetectConflictsUseCase(pathResolver)
 
     @Provides @Singleton
     fun providePolicyRepository(
