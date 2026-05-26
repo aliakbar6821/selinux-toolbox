@@ -18,7 +18,6 @@ import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// FIXED: Using ContextFileType enum constants instead of string literals
 @Singleton
 class GenerateMissingContextsUseCase @Inject constructor(
     private val fullComparisonUseCase: FullComparisonUseCase,
