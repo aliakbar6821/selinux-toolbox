@@ -2,6 +2,8 @@ package com.selinuxtoolbox.feature.projects
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.FolderOff
@@ -58,7 +60,7 @@ fun CreateProjectScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp)
-                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .verticalScroll(rememberScrollState())
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -134,7 +136,6 @@ fun CreateProjectScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
-                // ✅ was submitCreateProject (private) — now onRequestCreate (public)
                 onClick  = viewModel::onRequestCreate,
                 modifier = Modifier.fillMaxWidth(),
                 enabled  = !formState.isSubmitting
@@ -153,7 +154,6 @@ fun CreateProjectScreen(
         }
     }
 
-    // Mode dialog — shown on top of this screen after name is validated
     if (formState.showModeDialog) {
         ModeDialog(
             projectName = formState.name,
