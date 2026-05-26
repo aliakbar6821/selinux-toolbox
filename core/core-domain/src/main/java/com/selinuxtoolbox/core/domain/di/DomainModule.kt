@@ -1,5 +1,6 @@
 package com.selinuxtoolbox.core.domain.di
 
+import com.selinuxtoolbox.core.data.binary.BinaryManager
 import com.selinuxtoolbox.core.data.db.ActionDao
 import com.selinuxtoolbox.core.data.db.NoteDao
 import com.selinuxtoolbox.core.data.db.ProjectDao
@@ -9,6 +10,7 @@ import com.selinuxtoolbox.core.data.root.RootShell
 import com.selinuxtoolbox.core.domain.analyzer.CleanupEngine
 import com.selinuxtoolbox.core.domain.analyzer.RcSeclabelScanner
 import com.selinuxtoolbox.core.domain.parser.AvcDenialParser
+import com.selinuxtoolbox.core.domain.parser.RcFileParser
 import com.selinuxtoolbox.core.domain.path.PathResolver
 import com.selinuxtoolbox.core.domain.path.WorkspaceValidator
 import com.selinuxtoolbox.core.domain.repository.ActionRepository
@@ -17,6 +19,8 @@ import com.selinuxtoolbox.core.domain.repository.PolicyRepository
 import com.selinuxtoolbox.core.domain.usecase.RunCleanupUseCase
 import com.selinuxtoolbox.core.domain.usecase.RunRcSeclabelScanUseCase
 import com.selinuxtoolbox.core.domain.usecase.SetActiveProjectUseCase
+import com.selinuxtoolbox.core.domain.usecase.ValidateCilUseCase
+import com.selinuxtoolbox.core.domain.usecase.ValidateSeclabelsUseCase
 import com.selinuxtoolbox.core.domain.usecase.ValidateWorkspaceUseCase
 import dagger.Module
 import dagger.Provides
@@ -30,6 +34,9 @@ object DomainModule {
 
     @Provides @Singleton
     fun provideAvcDenialParser(): AvcDenialParser = AvcDenialParser()
+
+    @Provides @Singleton
+    fun provideRcFileParser(): RcFileParser = RcFileParser()
 
     @Provides @Singleton
     fun provideCleanupEngine(): CleanupEngine = CleanupEngine()
@@ -52,6 +59,18 @@ object DomainModule {
     @Provides @Singleton
     fun provideRunRcSeclabelScanUseCase(scanner: RcSeclabelScanner): RunRcSeclabelScanUseCase =
         RunRcSeclabelScanUseCase(scanner)
+
+    @Provides @Singleton
+    fun provideValidateCilUseCase(
+        binaryManager: BinaryManager,
+        pathResolver: PathResolver
+    ): ValidateCilUseCase = ValidateCilUseCase(binaryManager, pathResolver)
+
+    @Provides @Singleton
+    fun provideValidateSeclabelsUseCase(
+        rcFileParser: RcFileParser,
+        pathResolver: PathResolver
+    ): ValidateSeclabelsUseCase = ValidateSeclabelsUseCase(rcFileParser, pathResolver)
 
     @Provides @Singleton
     fun providePolicyRepository(
