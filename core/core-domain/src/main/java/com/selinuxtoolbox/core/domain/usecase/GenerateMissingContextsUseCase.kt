@@ -18,6 +18,7 @@ import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
+// FIXED: Using ContextFileType enum constants instead of string literals
 @Singleton
 class GenerateMissingContextsUseCase @Inject constructor(
     private val fullComparisonUseCase: FullComparisonUseCase,
@@ -38,7 +39,6 @@ class GenerateMissingContextsUseCase @Inject constructor(
             }
             val report = (comparisonResult as FullComparisonResult.Success).report
 
-            // Filter missing entries by accepted types and safety
             val missingEntries = report.missingContextEntries
                 .filter { it.type in acceptedTypes }
                 .filter { SafetyConfig.classify(it.type) != TypeSafety.UNSAFE }
