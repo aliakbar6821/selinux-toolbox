@@ -1,38 +1,21 @@
 package com.selinuxtoolbox.feature.projects
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.material.icons.filled.FolderOff
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.selinuxtoolbox.core.model.ActiveMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +58,7 @@ fun CreateProjectScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
                 .imePadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -88,16 +71,14 @@ fun CreateProjectScreen(
             )
 
             OutlinedTextField(
-                value = formState.name,
+                value         = formState.name,
                 onValueChange = viewModel::onNameChange,
-                label = { Text("Project Name *") },
-                placeholder = { Text("e.g. Nord3_to_MotoG54") },
-                isError = formState.nameError != null,
-                supportingText = {
-                    formState.nameError?.let { Text(it) }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                label         = { Text("Project Name *") },
+                placeholder   = { Text("e.g. ColorOS") },
+                isError       = formState.nameError != null,
+                supportingText = { formState.nameError?.let { Text(it) } },
+                modifier      = Modifier.fillMaxWidth(),
+                singleLine    = true
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -108,21 +89,21 @@ fun CreateProjectScreen(
             )
 
             OutlinedTextField(
-                value = formState.sourceDevice,
+                value         = formState.sourceDevice,
                 onValueChange = viewModel::onSourceDeviceChange,
-                label = { Text("Source Device") },
-                placeholder = { Text("e.g. OnePlus Nord 3 5G") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                label         = { Text("Source Device") },
+                placeholder   = { Text("e.g. OnePlus ACE2V") },
+                modifier      = Modifier.fillMaxWidth(),
+                singleLine    = true
             )
 
             OutlinedTextField(
-                value = formState.sourceRom,
+                value         = formState.sourceRom,
                 onValueChange = viewModel::onSourceRomChange,
-                label = { Text("Source ROM") },
-                placeholder = { Text("e.g. OxygenOS 13.1") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                label         = { Text("Source ROM") },
+                placeholder   = { Text("e.g. ColorOS 14") },
+                modifier      = Modifier.fillMaxWidth(),
+                singleLine    = true
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -133,33 +114,34 @@ fun CreateProjectScreen(
             )
 
             OutlinedTextField(
-                value = formState.targetDevice,
+                value         = formState.targetDevice,
                 onValueChange = viewModel::onTargetDeviceChange,
-                label = { Text("Target Device") },
-                placeholder = { Text("e.g. Moto G54 5G") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                label         = { Text("Target Device") },
+                placeholder   = { Text("e.g. Moto G54") },
+                modifier      = Modifier.fillMaxWidth(),
+                singleLine    = true
             )
 
             OutlinedTextField(
-                value = formState.targetRom,
+                value         = formState.targetRom,
                 onValueChange = viewModel::onTargetRomChange,
-                label = { Text("Target ROM") },
-                placeholder = { Text("e.g. HyperOS 1.0") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                label         = { Text("Target ROM") },
+                placeholder   = { Text("e.g. LineageOS 21") },
+                modifier      = Modifier.fillMaxWidth(),
+                singleLine    = true
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
-                onClick = viewModel::submitCreateProject,
+                // ✅ was submitCreateProject (private) — now onRequestCreate (public)
+                onClick  = viewModel::onRequestCreate,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !formState.isSubmitting
+                enabled  = !formState.isSubmitting
             ) {
                 if (formState.isSubmitting) {
                     CircularProgressIndicator(
-                        modifier = Modifier.height(20.dp),
+                        modifier    = Modifier.height(20.dp),
                         strokeWidth = 2.dp
                     )
                 } else {
@@ -170,4 +152,84 @@ fun CreateProjectScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
+
+    // Mode dialog — shown on top of this screen after name is validated
+    if (formState.showModeDialog) {
+        ModeDialog(
+            projectName = formState.name,
+            onOffline   = { viewModel.onModeSelected(ActiveMode.OFFLINE) },
+            onLive      = { viewModel.onModeSelected(ActiveMode.LIVE) },
+            onDismiss   = { viewModel.onModeDismissed() }
+        )
+    }
+}
+
+@Composable
+private fun ModeDialog(
+    projectName: String,
+    onOffline: () -> Unit,
+    onLive: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose project mode") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "\"$projectName\"",
+                    style      = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable { onOffline() },
+                    colors   = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.FolderOff, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("OFFLINE", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Device not fully booted. Creates folders on SD card:\n" +
+                            "  OEM/  AOSP/  work/  logs/\n" +
+                            "Each with system/ system_ext/ product/ vendor/ odm/\n" +
+                            "and selinux/ + init/ inside each partition.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable { onLive() },
+                    colors   = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.PhoneAndroid, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("LIVE", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Device is booted with root. App reads live\n" +
+                            "partitions directly via root shell.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
