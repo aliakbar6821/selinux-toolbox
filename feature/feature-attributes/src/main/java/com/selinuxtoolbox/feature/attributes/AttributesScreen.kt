@@ -56,6 +56,7 @@ fun AttributesScreen(
                     step = step,
                     onBack = viewModel::reset
                 )
+                is AttributesStep.Generating -> LoadingContent() // Show loading while generating
                 is AttributesStep.Error -> ErrorContent(
                     message = step.message,
                     onRetry = viewModel::reset
@@ -93,7 +94,7 @@ private fun IdleContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
-            imageVector = Icons.Default.Attribute,
+            imageVector = Icons.Default.Category,
             contentDescription = null,
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.primary

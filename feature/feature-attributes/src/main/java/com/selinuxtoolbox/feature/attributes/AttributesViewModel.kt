@@ -25,13 +25,13 @@ sealed class AttributesStep {
     object NoProject : AttributesStep()
     object Idle : AttributesStep()
     object Scanning : AttributesStep()
+    object Generating : AttributesStep()
     data class Results(
         val missingCount: Int,
         val outputDir: String? = null,
         val allCilFile: String? = null,
         val partitionFiles: Map<String, String> = emptyMap()
     ) : AttributesStep()
-    object Generating : AttributesStep()
     data class Done(val outputDir: String) : AttributesStep()
     data class Error(val message: String) : AttributesStep()
 }
