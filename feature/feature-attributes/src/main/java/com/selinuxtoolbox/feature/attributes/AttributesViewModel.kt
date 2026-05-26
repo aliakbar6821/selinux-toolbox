@@ -105,7 +105,10 @@ class AttributesViewModel @Inject constructor(
 
             when (result) {
                 is FixAttributesResult.Success -> {
-                    val partitionFiles = result.partitionFiles.mapValues { it.value.absolutePath }
+                    // Convert PolicyPartition keys to String (partition directory name)
+                    val partitionFiles = result.partitionFiles
+                        .mapKeys { it.key.dirName }
+                        .mapValues { it.value.absolutePath }
                     _uiState.update {
                         it.copy(
                             step = AttributesStep.Results(
