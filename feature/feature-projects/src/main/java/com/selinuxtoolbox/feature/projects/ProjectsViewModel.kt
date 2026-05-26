@@ -52,7 +52,6 @@ data class CreateProjectFormState(
     val sourceRom: String = "",
     val targetRom: String = "",
     val mode: ActiveMode = ActiveMode.OFFLINE,
-    // Dialog flow: user fills name → mode dialog → submitting
     val showModeDialog: Boolean = false,
     val nameError: String? = null,
     val isSubmitting: Boolean = false
@@ -82,13 +81,13 @@ class ProjectsViewModel @Inject constructor(
     private val appPreferences: AppPreferences
 ) : ViewModel() {
 
-    private val _uiState    = MutableStateFlow(ProjectsUiState())
+    private val _uiState     = MutableStateFlow(ProjectsUiState())
     val uiState: StateFlow<ProjectsUiState> = _uiState.asStateFlow()
 
     private val _detailState = MutableStateFlow(ProjectDetailUiState())
     val detailState: StateFlow<ProjectDetailUiState> = _detailState.asStateFlow()
 
-    private val _formState  = MutableStateFlow(CreateProjectFormState())
+    private val _formState   = MutableStateFlow(CreateProjectFormState())
     val formState: StateFlow<CreateProjectFormState> = _formState.asStateFlow()
 
     private val _events = MutableSharedFlow<ProjectsEvent>()
@@ -96,8 +95,8 @@ class ProjectsViewModel @Inject constructor(
 
     val outputPath: StateFlow<String> = appPreferences.outputFolderPath
         .stateIn(
-            scope   = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            scope    = viewModelScope,
+            started  = SharingStarted.WhileSubscribed(5000),
             initialValue = "/sdcard/SELinuxToolbox"
         )
 
@@ -133,10 +132,11 @@ class ProjectsViewModel @Inject constructor(
         }
     }
 
-    // ── Form field updates ────────────────────────────────────────────────────
+    // ── Form fields ───────────────────────────────────────────────────────────
 
+    // trimStart prevents leading spaces from sneaking into folder names
     fun onNameChange(value: String) =
-        _formState.update { it.copy(name = value, nameError = null) }
+        _formState.update { it.copy(name = value.trimStart(), nameError = null) }
 
     fun onSourceDeviceChange(value: String) =
         _formState.update { it.copy(sourceDevice = value) }
@@ -155,33 +155,34 @@ class ProjectsViewModel @Inject constructor(
     // ── Create flow ───────────────────────────────────────────────────────────
 
     /**
-     * Called when user taps "Create" on the form.
-     * Validates name, then shows the OFFLINE / LIVE mode picker dialog.
+     * Step 1: validate name, then show OFFLINE/LIVE mode dialog.
+     * Always trims the name before any check so " ColorOS" → "ColorOS".
      */
     fun onRequestCreate() {
-        val form = _formState.value
-        if (form.name.isBlank()) {
+        val trimmedName = _formState.value.name.trim()
+        // Write trimmed value back so the field shows it correctly
+        _formState.update { it.copy(name = trimmedName) }
+
+        if (trimmedName.isBlank()) {
             _formState.update { it.copy(nameError = "Project name is required") }
             return
         }
         val duplicate = _uiState.value.projects.any {
-            it.name.equals(form.name.trim(), ignoreCase = true)
+            it.name.equals(trimmedName, ignoreCase = true)
         }
         if (duplicate) {
             _formState.update { it.copy(nameError = "A project with this name already exists") }
             return
         }
-        // Show mode dialog
         _formState.update { it.copy(showModeDialog = true, nameError = null) }
     }
 
-    /** Called when user picks OFFLINE or LIVE in the mode dialog. */
+    /** Step 2: user picked OFFLINE or LIVE — now actually create. */
     fun onModeSelected(mode: ActiveMode) {
         _formState.update { it.copy(mode = mode, showModeDialog = false) }
         submitCreateProject()
     }
 
-    /** Dismiss the mode dialog without creating. */
     fun onModeDismissed() {
         _formState.update { it.copy(showModeDialog = false) }
     }
@@ -191,7 +192,7 @@ class ProjectsViewModel @Inject constructor(
         viewModelScope.launch {
             _formState.update { it.copy(isSubmitting = true) }
             val result = createProjectUseCase(
-                name           = form.name.trim(),
+                name           = form.name,        // already trimmed in onRequestCreate
                 sourceDevice   = form.sourceDevice.trim(),
                 targetDevice   = form.targetDevice.trim(),
                 sourceRom      = form.sourceRom.trim(),
@@ -218,7 +219,7 @@ class ProjectsViewModel @Inject constructor(
         viewModelScope.launch {
             deleteProjectUseCase(project.id).fold(
                 onSuccess = { _events.emit(ProjectsEvent.ProjectDeleted(project.name)) },
-                onFailure = { e -> _events.emit(ProjectsEvent.Error(e.message ?: "Failed to delete project")) }
+                onFailure = { e -> _events.emit(ProjectsEvent.Error(e.message ?: "Failed to delete")) }
             )
         }
     }
@@ -229,7 +230,7 @@ class ProjectsViewModel @Inject constructor(
         viewModelScope.launch {
             archiveProjectUseCase(projectId).fold(
                 onSuccess = {},
-                onFailure = { e -> _events.emit(ProjectsEvent.Error(e.message ?: "Failed to archive project")) }
+                onFailure = { e -> _events.emit(ProjectsEvent.Error(e.message ?: "Failed to archive")) }
             )
         }
     }
@@ -240,7 +241,7 @@ class ProjectsViewModel @Inject constructor(
         viewModelScope.launch {
             setActiveProjectUseCase(projectId).fold(
                 onSuccess = { _events.emit(ProjectsEvent.ActiveProjectSet(projectId)) },
-                onFailure = { e -> _events.emit(ProjectsEvent.Error(e.message ?: "Failed to set active project")) }
+                onFailure = { e -> _events.emit(ProjectsEvent.Error(e.message ?: "Failed to set active")) }
             )
         }
     }
