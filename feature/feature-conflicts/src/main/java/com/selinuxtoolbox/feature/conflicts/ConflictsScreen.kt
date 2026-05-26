@@ -1,5 +1,6 @@
 package com.selinuxtoolbox.feature.conflicts
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -64,7 +65,8 @@ fun ConflictsScreen(
                 return@Scaffold
             }
 
-            if (uiState.report == null) {
+            val report = uiState.report
+            if (report == null) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -88,8 +90,6 @@ fun ConflictsScreen(
                 }
                 return@Scaffold
             }
-
-            val report = uiState.report
 
             // Summary cards
             Row(
