@@ -11,6 +11,8 @@ import com.selinuxtoolbox.feature.dashboard.dashboardScreen
 import com.selinuxtoolbox.feature.denials.denialsScreen
 import com.selinuxtoolbox.feature.denials.navigateToDenials
 import com.selinuxtoolbox.feature.diff.diffScreen
+import com.selinuxtoolbox.feature.explorer.EXPLORER_ROUTE
+import com.selinuxtoolbox.feature.explorer.explorerScreen
 import com.selinuxtoolbox.feature.offline.rcScanScreen
 import com.selinuxtoolbox.feature.projects.navigateToProjects
 import com.selinuxtoolbox.feature.projects.projectsGraph
@@ -44,8 +46,9 @@ fun AppNavGraph() {
 
         diffScreen()
 
+        explorerScreen()
+
         composable("contexts")  { androidx.compose.material3.Text("Contexts — coming soon") }
         composable("conflicts") { androidx.compose.material3.Text("Conflicts — coming soon") }
-        composable("explorer")  { androidx.compose.material3.Text("Explorer — coming soon") }
     }
 }

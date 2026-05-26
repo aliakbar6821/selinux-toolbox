@@ -38,6 +38,7 @@ import com.selinuxtoolbox.core.domain.usecase.GetRecentDenialsUseCase
 import com.selinuxtoolbox.core.domain.usecase.GetSelinuxStatusUseCase
 import com.selinuxtoolbox.core.domain.usecase.ImportLogUseCase
 import com.selinuxtoolbox.core.domain.usecase.ImportProjectUseCase
+import com.selinuxtoolbox.core.domain.usecase.ManualTypeSearchUseCase
 import com.selinuxtoolbox.core.domain.usecase.RunCleanupUseCase
 import com.selinuxtoolbox.core.domain.usecase.RunRcSeclabelScanUseCase
 import com.selinuxtoolbox.core.domain.usecase.SetActiveProjectUseCase
@@ -125,6 +126,15 @@ object DomainModule {
         rcFileParser: RcFileParser
     ): FullComparisonUseCase = FullComparisonUseCase(
         pathResolver, rootFileReader, contextFileParser, rcFileParser
+    )
+
+    @Provides @Singleton
+    fun provideManualTypeSearchUseCase(
+        pathResolver: PathResolver,
+        contextFileParser: ContextFileParser,
+        rcFileParser: RcFileParser
+    ): ManualTypeSearchUseCase = ManualTypeSearchUseCase(
+        pathResolver, contextFileParser, rcFileParser
     )
 
     @Provides @Singleton
