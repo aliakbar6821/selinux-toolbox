@@ -14,7 +14,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.selinuxtoolbox.core.domain.usecase.GenerateMissingContextsResult
 import com.selinuxtoolbox.core.model.ContextFileType
 import com.selinuxtoolbox.core.model.Partition
 import com.selinuxtoolbox.core.ui.components.CodeBlock
