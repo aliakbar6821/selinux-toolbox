@@ -12,12 +12,14 @@ fun NavController.navigateToDashboard() = navigate(DASHBOARD_ROUTE) {
 
 fun NavGraphBuilder.dashboardScreen(
     onNavigateToProjects: () -> Unit,
-    onNavigateToDenials: () -> Unit
+    onNavigateToDenials: () -> Unit,
+    onNavigateToContextDiff: () -> Unit
 ) {
     composable(DASHBOARD_ROUTE) {
         DashboardScreen(
             onNavigateToProjects = onNavigateToProjects,
-            onNavigateToDenials = onNavigateToDenials
+            onNavigateToDenials = onNavigateToDenials,
+            onNavigateToContextDiff = onNavigateToContextDiff
         )
     }
 }

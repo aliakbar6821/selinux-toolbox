@@ -10,6 +10,8 @@ import com.selinuxtoolbox.feature.conflicts.CONFLICTS_ROUTE
 import com.selinuxtoolbox.feature.conflicts.conflictsScreen
 import com.selinuxtoolbox.feature.contexts.CONTEXTS_ROUTE
 import com.selinuxtoolbox.feature.contexts.contextsScreen
+import com.selinuxtoolbox.feature.contextdiff.CONTEXT_DIFF_ROUTE
+import com.selinuxtoolbox.feature.contextdiff.contextDiffScreen
 import com.selinuxtoolbox.feature.dashboard.DASHBOARD_ROUTE
 import com.selinuxtoolbox.feature.dashboard.dashboardScreen
 import com.selinuxtoolbox.feature.denials.denialsScreen
@@ -33,7 +35,8 @@ fun AppNavGraph() {
     ) {
         dashboardScreen(
             onNavigateToProjects = { navController.navigateToProjects() },
-            onNavigateToDenials  = { navController.navigateToDenials() }
+            onNavigateToDenials  = { navController.navigateToDenials() },
+            onNavigateToContextDiff = { navController.navigateToContextDiff() }
         )
 
         projectsGraph(navController = navController)
@@ -55,5 +58,7 @@ fun AppNavGraph() {
         contextsScreen()
 
         conflictsScreen()
+
+        contextDiffScreen()
     }
 }

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.ClearAll
+import androidx.compose.material.icons.filled.Diff
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
@@ -73,6 +74,7 @@ import java.util.Locale
 fun DashboardScreen(
     onNavigateToProjects: () -> Unit,
     onNavigateToDenials: () -> Unit,
+    onNavigateToContextDiff: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -147,7 +149,8 @@ fun DashboardScreen(
             item {
                 QuickActionsRow(
                     onNavigateToDenials = onNavigateToDenials,
-                    onNavigateToProjects = onNavigateToProjects
+                    onNavigateToProjects = onNavigateToProjects,
+                    onNavigateToContextDiff = onNavigateToContextDiff
                 )
             }
 
@@ -366,7 +369,8 @@ private fun ActiveProjectCard(
 @Composable
 private fun QuickActionsRow(
     onNavigateToDenials: () -> Unit,
-    onNavigateToProjects: () -> Unit
+    onNavigateToProjects: () -> Unit,
+    onNavigateToContextDiff: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -380,9 +384,15 @@ private fun QuickActionsRow(
         )
         QuickActionCard(
             modifier = Modifier.weight(1f),
+            icon = Icons.Default.Diff,
+            label = "Context\nDiff",
+            onClick = onNavigateToContextDiff
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
             icon = Icons.Default.CleaningServices,
             label = "Cleanup\nPolicy",
-            onClick = onNavigateToProjects  // placeholder until cleanup screen is built
+            onClick = onNavigateToProjects
         )
         QuickActionCard(
             modifier = Modifier.weight(1f),
