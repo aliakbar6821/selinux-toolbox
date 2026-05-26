@@ -32,14 +32,12 @@ class GenerateMissingContextsUseCase @Inject constructor(
         acceptedTypes: Set<String>
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
-            // 1. Run full comparison to get all missing context entries
             val comparisonResult = fullComparisonUseCase(oemPath, aospPath, workPath)
             if (comparisonResult is FullComparisonResult.SetupError) {
                 return@withContext Result.failure(Exception(comparisonResult.reason))
             }
             val report = (comparisonResult as FullComparisonResult.Success).report
 
-            // 2. Filter missing context entries by accepted types
             val missingEntries = report.missingContextEntries
                 .filter { it.type in acceptedTypes }
                 .filter { SafetyConfig.classify(it.type) != TypeSafety.UNSAFE }
@@ -48,10 +46,8 @@ class GenerateMissingContextsUseCase @Inject constructor(
                 return@withContext Result.failure(Exception("No missing context entries to generate"))
             }
 
-            // 3. Group by partition
             val byPartition = missingEntries.groupBy { it.partition }
 
-            // 4. Generate output
             val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
             val outDir = File(workPath, "outputs/context_diff_$ts")
             outDir.mkdirs()
@@ -62,7 +58,6 @@ class GenerateMissingContextsUseCase @Inject constructor(
                 val partition = PolicyPartition.values().firstOrNull { it.dirName == partitionName }
                     ?: PolicyPartition.VENDOR
 
-                // Type declarations
                 val types = entries.map { it.type }.distinct()
                 val cilSb = StringBuilder()
                 val fcSb = StringBuilder()
@@ -72,7 +67,6 @@ class GenerateMissingContextsUseCase @Inject constructor(
                 cilSb.appendLine()
 
                 types.forEach { typeName ->
-                    // Determine appropriate type declaration class from context file type
                     val entry = entries.first { it.type == typeName }
                     val fileType = entry.fileType
                     val cilBlock = when (fileType) {
@@ -92,7 +86,6 @@ class GenerateMissingContextsUseCase @Inject constructor(
                     cilSb.append(cilBlock).append("\n")
                 }
 
-                // Context entries (the actual lines to append)
                 entries.forEach { entry ->
                     fcSb.appendLine(entry.pattern + "    " + entry.context)
                 }
@@ -100,7 +93,6 @@ class GenerateMissingContextsUseCase @Inject constructor(
                 val cilFile = File(outDir, "${partition.dirName}_sepolicy.cil")
                 cilFile.writeText(cilSb.toString())
 
-                // Build context file name based on the first entry's fileType
                 val firstEntryFileType = entries.first().fileType
                 val contextFileName = when (firstEntryFileType) {
                     ContextFileType.FILE -> "${partition.dirName}_file_contexts"
@@ -114,7 +106,6 @@ class GenerateMissingContextsUseCase @Inject constructor(
                 val contextFile = File(outDir, contextFileName)
                 contextFile.writeText(fcSb.toString())
 
-                // Instructions
                 instructions.add(
                     OutputFileInstruction(
                         fileName = cilFile.name,
@@ -133,7 +124,6 @@ class GenerateMissingContextsUseCase @Inject constructor(
                 )
             }
 
-            // Write INSTRUCTIONS.txt
             val instructionsTxt = File(outDir, "INSTRUCTIONS.txt")
             instructionsTxt.writeText(
                 CilGenerator.instructionsTxt("Context Diff", instructions)
