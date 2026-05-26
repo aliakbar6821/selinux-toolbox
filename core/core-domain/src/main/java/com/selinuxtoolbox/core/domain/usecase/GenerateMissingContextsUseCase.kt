@@ -1,6 +1,5 @@
 package com.selinuxtoolbox.core.domain.usecase
 
-import com.selinuxtoolbox.core.data.util.FileUtil
 import com.selinuxtoolbox.core.domain.analyzer.CilGenerator
 import com.selinuxtoolbox.core.domain.analyzer.OutputFileInstruction
 import com.selinuxtoolbox.core.domain.analyzer.SafetyConfig
@@ -68,9 +67,14 @@ class GenerateMissingContextsUseCase @Inject constructor(
 
                 types.forEach { typeName ->
                     val entry = entries.first { it.type == typeName }
-                    val fileType = entry.fileType
+                    // fileType is stored as String (enum.name) in MissingContextEntry
+                    val fileType = runCatching { ContextFileType.valueOf(entry.fileType) }
+                        .getOrElse { ContextFileType.FILE }
+
                     val cilBlock = when (fileType) {
-                        ContextFileType.FILE, ContextFileType.SEAPP, ContextFileType.PROCESS ->
+                        ContextFileType.FILE,
+                        ContextFileType.SEAPP,
+                        ContextFileType.PROCESS ->
                             CilGenerator.fileType(typeName, partition)
                         ContextFileType.PROPERTY ->
                             CilGenerator.propertyType(typeName)
@@ -80,8 +84,6 @@ class GenerateMissingContextsUseCase @Inject constructor(
                             CilGenerator.hwserviceType(typeName)
                         ContextFileType.VNDSERVICE ->
                             CilGenerator.serviceType(typeName)
-                        else ->
-                            CilGenerator.fileType(typeName, partition)
                     }
                     cilSb.append(cilBlock).append("\n")
                 }
@@ -93,16 +95,17 @@ class GenerateMissingContextsUseCase @Inject constructor(
                 val cilFile = File(outDir, "${partition.dirName}_sepolicy.cil")
                 cilFile.writeText(cilSb.toString())
 
-                // 🔥 FIX: Convert String to ContextFileType enum
-                val firstEntryFileType = ContextFileType.valueOf(entries.first().fileType)
-                val contextFileName = when (firstEntryFileType) {
-                    ContextFileType.FILE -> "${partition.dirName}_file_contexts"
+                val firstFileType = runCatching { ContextFileType.valueOf(entries.first().fileType) }
+                    .getOrElse { ContextFileType.FILE }
+
+                val contextFileName = when (firstFileType) {
+                    ContextFileType.FILE    -> "${partition.dirName}_file_contexts"
                     ContextFileType.PROPERTY -> "${partition.dirName}_property_contexts"
-                    ContextFileType.SERVICE -> "${partition.dirName}_service_contexts"
+                    ContextFileType.SERVICE  -> "${partition.dirName}_service_contexts"
                     ContextFileType.HWSERVICE -> "${partition.dirName}_hwservice_contexts"
                     ContextFileType.VNDSERVICE -> "vndservice_contexts"
-                    ContextFileType.SEAPP -> "${partition.dirName}_seapp_contexts"
-                    else -> "${partition.dirName}_file_contexts"
+                    ContextFileType.SEAPP   -> "${partition.dirName}_seapp_contexts"
+                    ContextFileType.PROCESS -> "${partition.dirName}_file_contexts"
                 }
                 val contextFile = File(outDir, contextFileName)
                 contextFile.writeText(fcSb.toString())
@@ -136,4 +139,3 @@ class GenerateMissingContextsUseCase @Inject constructor(
         }
     }
 }
-// FORCE UPDATE: Tue May 26 21:31:36 PKT 2026
