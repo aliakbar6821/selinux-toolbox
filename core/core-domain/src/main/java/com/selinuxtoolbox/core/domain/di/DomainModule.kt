@@ -10,6 +10,7 @@ import com.selinuxtoolbox.core.data.root.RootShell
 import com.selinuxtoolbox.core.domain.analyzer.CleanupEngine
 import com.selinuxtoolbox.core.domain.analyzer.RcSeclabelScanner
 import com.selinuxtoolbox.core.domain.parser.AvcDenialParser
+import com.selinuxtoolbox.core.domain.parser.ContextFileParser
 import com.selinuxtoolbox.core.domain.parser.RcFileParser
 import com.selinuxtoolbox.core.domain.path.PathResolver
 import com.selinuxtoolbox.core.domain.path.WorkspaceValidator
@@ -26,6 +27,7 @@ import com.selinuxtoolbox.core.domain.usecase.DeleteProjectUseCase
 import com.selinuxtoolbox.core.domain.usecase.DiffPolicyUseCase
 import com.selinuxtoolbox.core.domain.usecase.ExportProjectUseCase
 import com.selinuxtoolbox.core.domain.usecase.FixMissingAttributesUseCase
+import com.selinuxtoolbox.core.domain.usecase.FullComparisonUseCase
 import com.selinuxtoolbox.core.domain.usecase.GetActiveProjectUseCase
 import com.selinuxtoolbox.core.domain.usecase.GetAllProjectsUseCase
 import com.selinuxtoolbox.core.domain.usecase.GetCompilationOrderUseCase
@@ -61,6 +63,9 @@ object DomainModule {
 
     @Provides @Singleton
     fun provideRcFileParser(): RcFileParser = RcFileParser()
+
+    @Provides @Singleton
+    fun provideContextFileParser(): ContextFileParser = ContextFileParser()
 
     @Provides @Singleton
     fun provideCleanupEngine(): CleanupEngine = CleanupEngine()
@@ -111,6 +116,16 @@ object DomainModule {
     fun provideFixMissingAttributesUseCase(
         pathResolver: PathResolver
     ): FixMissingAttributesUseCase = FixMissingAttributesUseCase(pathResolver)
+
+    @Provides @Singleton
+    fun provideFullComparisonUseCase(
+        pathResolver: PathResolver,
+        rootFileReader: RootFileReader,
+        contextFileParser: ContextFileParser,
+        rcFileParser: RcFileParser
+    ): FullComparisonUseCase = FullComparisonUseCase(
+        pathResolver, rootFileReader, contextFileParser, rcFileParser
+    )
 
     @Provides @Singleton
     fun providePolicyRepository(
