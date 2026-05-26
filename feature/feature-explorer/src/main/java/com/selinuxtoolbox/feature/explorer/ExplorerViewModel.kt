@@ -11,11 +11,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -44,6 +44,13 @@ class ExplorerViewModel @Inject constructor(
     private val _events = MutableSharedFlow<ExplorerEvent>()
     val events: SharedFlow<ExplorerEvent> = _events.asSharedFlow()
 
+    // Convert Flow<String> to StateFlow<String> – provides .value without suspend
+    private val outputPath: StateFlow<String> = appPreferences.outputFolderPath.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = "/sdcard/SELinuxToolbox"
+    )
+
     fun onSearchQueryChange(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
     }
@@ -59,8 +66,8 @@ class ExplorerViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSearching = true) }
 
-            // Use take(1).first() – clearly suspending and reliable
-            val outputPath = appPreferences.outputFolderPath.take(1).first()
+            // Use .value – no suspend needed
+            val outputPath = outputPath.value
             val oemPath = "$outputPath/OEM"
             val aospPath = "$outputPath/AOSP"
 
@@ -83,7 +90,7 @@ class ExplorerViewModel @Inject constructor(
         if (result !is ManualSearchResult.Found) return
 
         val typeName = result.result.typeName
-        val workPath = appPreferences.outputFolderPath.take(1).first()
+        val workPath = outputPath.value
 
         viewModelScope.launch {
             val generateResult = manualTypeSearchUseCase.generateFix(
