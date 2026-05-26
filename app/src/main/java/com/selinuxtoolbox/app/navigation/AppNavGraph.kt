@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.selinuxtoolbox.feature.attributes.ATTRIBUTES_ROUTE
+import com.selinuxtoolbox.feature.attributes.attributesScreen
 import com.selinuxtoolbox.feature.cleanup.cleanupScreen
 import com.selinuxtoolbox.feature.compile.compileScreen
 import com.selinuxtoolbox.feature.conflicts.CONFLICTS_ROUTE
@@ -61,5 +63,7 @@ fun AppNavGraph() {
         conflictsScreen()
 
         contextDiffScreen()
+
+        attributesScreen()
     }
 }
