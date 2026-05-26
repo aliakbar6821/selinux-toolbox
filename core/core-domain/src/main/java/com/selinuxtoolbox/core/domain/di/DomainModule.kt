@@ -16,6 +16,7 @@ import com.selinuxtoolbox.core.domain.path.WorkspaceValidator
 import com.selinuxtoolbox.core.domain.repository.ActionRepository
 import com.selinuxtoolbox.core.domain.repository.BackupOrchestrator
 import com.selinuxtoolbox.core.domain.repository.PolicyRepository
+import com.selinuxtoolbox.core.domain.usecase.CompilePolicyUseCase
 import com.selinuxtoolbox.core.domain.usecase.RunCleanupUseCase
 import com.selinuxtoolbox.core.domain.usecase.RunRcSeclabelScanUseCase
 import com.selinuxtoolbox.core.domain.usecase.SetActiveProjectUseCase
@@ -71,6 +72,12 @@ object DomainModule {
         rcFileParser: RcFileParser,
         pathResolver: PathResolver
     ): ValidateSeclabelsUseCase = ValidateSeclabelsUseCase(rcFileParser, pathResolver)
+
+    @Provides @Singleton
+    fun provideCompilePolicyUseCase(
+        binaryManager: BinaryManager,
+        pathResolver: PathResolver
+    ): CompilePolicyUseCase = CompilePolicyUseCase(binaryManager, pathResolver)
 
     @Provides @Singleton
     fun providePolicyRepository(

@@ -5,6 +5,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.selinuxtoolbox.feature.cleanup.cleanupScreen
+import com.selinuxtoolbox.feature.compile.compileScreen
 import com.selinuxtoolbox.feature.dashboard.DASHBOARD_ROUTE
 import com.selinuxtoolbox.feature.dashboard.dashboardScreen
 import com.selinuxtoolbox.feature.denials.denialsScreen
@@ -38,10 +39,11 @@ fun AppNavGraph() {
 
         validatorScreen()
 
-        composable("contexts")  { androidx.compose.material3.Text("Contexts — coming in Step 6") }
-        composable("conflicts") { androidx.compose.material3.Text("Conflicts — coming in Step 7") }
-        composable("explorer")  { androidx.compose.material3.Text("Explorer — coming in Step 8") }
-        composable("diff")      { androidx.compose.material3.Text("Diff — coming in Step 9") }
-        composable("compile")   { androidx.compose.material3.Text("Compile — coming in Step 10") }
+        compileScreen()
+
+        composable("contexts")  { androidx.compose.material3.Text("Contexts — coming soon") }
+        composable("conflicts") { androidx.compose.material3.Text("Conflicts — coming soon") }
+        composable("explorer")  { androidx.compose.material3.Text("Explorer — coming soon") }
+        composable("diff")      { androidx.compose.material3.Text("Diff — coming soon") }
     }
 }
