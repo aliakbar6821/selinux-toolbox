@@ -15,11 +15,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.selinuxtoolbox.app.navigation.AppNavGraph
 import com.selinuxtoolbox.core.ui.theme.SELinuxToolboxTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -32,36 +36,49 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SELinuxToolboxTheme {
-                // Show storage permission dialog if not yet granted
-                var showStorageDialog by remember {
+
+                // Reactive permission state — re-evaluated on every ON_RESUME
+                var hasAllFilesAccess by remember {
                     mutableStateOf(
-                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
-                        !Environment.isExternalStorageManager()
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                            Environment.isExternalStorageManager()
+                        else
+                            true
                     )
                 }
 
-                if (showStorageDialog) {
+                val lifecycle = LocalLifecycleOwner.current.lifecycle
+                DisposableEffect(lifecycle) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME &&
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                        ) {
+                            hasAllFilesAccess = Environment.isExternalStorageManager()
+                        }
+                    }
+                    lifecycle.addObserver(observer)
+                    onDispose { lifecycle.removeObserver(observer) }
+                }
+
+                if (!hasAllFilesAccess) {
                     AlertDialog(
                         onDismissRequest = { /* force user to decide */ },
                         title = { Text("Storage Permission Required") },
-                        text  = {
+                        text = {
                             Text(
-                                "SELinux Toolbox needs full access to manage files on SD card " +
-                                "(OEM/, AOSP/, work/ folders).\n\n" +
-                                "Tap Grant to open Settings → Special App Access → " +
-                                "All Files Access, then enable it for SELinux Toolbox."
+                                "SELinux Toolbox needs All Files Access to read and write " +
+                                "OEM/, AOSP/, and work/ folders on SD card.\n\n" +
+                                "Tap Grant → Settings → Special App Access → " +
+                                "All Files Access → enable SELinux Toolbox."
                             )
                         },
                         confirmButton = {
-                            TextButton(onClick = {
-                                showStorageDialog = false
-                                requestManageStoragePermission()
-                            }) {
+                            TextButton(onClick = { requestManageStoragePermission() }) {
                                 Text("Grant")
                             }
                         },
                         dismissButton = {
-                            TextButton(onClick = { showStorageDialog = false }) {
+                            TextButton(onClick = { hasAllFilesAccess = true }) {
                                 Text("Later")
                             }
                         }
@@ -78,12 +95,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        // Re-check after user returns from Settings
-        // (no action needed — Compose will recompose if state changes)
-    }
-
     private fun requestManageStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
@@ -92,7 +103,6 @@ class MainActivity : ComponentActivity() {
                 }
                 startActivity(intent)
             } catch (e: Exception) {
-                // Fallback: open general storage settings
                 startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
             }
         }

@@ -28,43 +28,64 @@ class ImportLogUseCase @Inject constructor(
             val logsDir = pathResolver.importedLogsDir(workPath)
             logsDir.mkdirs()
 
-            // Copy file into project logs dir with timestamp to avoid collision
-            val ts = System.currentTimeMillis()
+            val ts       = System.currentTimeMillis()
             val destFile = File(logsDir, "${ts}_${sourceFile.name}")
             sourceFile.copyTo(destFile, overwrite = true)
 
-            val lines = destFile.readLines()
-            val logType = detectLogType(lines)
+            val lines    = destFile.readLines()
+            val logType  = detectLogType(lines)
 
-            // Count each error type
             val source = when (logType) {
                 LogType.LOGCAT -> DenialSource.LOGCAT
                 else           -> DenialSource.IMPORTED_FILE
             }
-            val avcCount          = lines.count { it.contains("avc:") && it.contains("denied") }
-            val unmappedCount     = lines.count {
+
+            val avcCount       = lines.count { it.contains("avc:") && it.contains("denied") }
+            val unmappedCount  = lines.count {
                 it.contains("is not valid") && it.contains("context")
             }
-            val undefinedCount    = lines.count {
+            val undefinedCount = lines.count {
                 it.contains("is not defined") || it.contains("neverallow")
             }
 
             val log = ImportedLog(
-                id                  = 0L, // Room will assign
-                projectId           = projectId,
-                fileName            = sourceFile.name,
-                filePath            = destFile.absolutePath,
-                importedAt          = ts,
-                logType             = logType,
-                totalLines          = lines.size,
-                avcDenialCount      = avcCount,
+                id                   = 0L,
+                projectId            = projectId,
+                fileName             = sourceFile.name,
+                filePath             = destFile.absolutePath,
+                importedAt           = ts,
+                logType              = logType,
+                totalLines           = lines.size,
+                avcDenialCount       = avcCount,
                 unmappedContextCount = unmappedCount,
-                undefinedTypeCount  = undefinedCount
+                undefinedTypeCount   = undefinedCount
             )
 
             ImportLogResult.Success(log)
+
         } catch (e: Exception) {
-            ImportLogResult.Failure("Failed to import log: ${e.message}")
+            val reason = when {
+                e.message?.contains("EPERM") == true ||
+                e.message?.contains("Operation not permitted") == true ->
+                    "Storage permission denied.\n\n" +
+                    "Grant All Files Access:\n" +
+                    "Settings → Special App Access → All Files Access\n" +
+                    "→ SELinux Toolbox → Allow\n\n" +
+                    "Then return to the app and try again."
+
+                e.message?.contains("ENOENT") == true ||
+                e.message?.contains("No such file") == true ->
+                    "Work folder not found: ${pathResolver.importedLogsDir(workPath).absolutePath}\n" +
+                    "Check that the project workspace path is correct."
+
+                e.message?.contains("EACCES") == true ->
+                    "Access denied writing to work/imported_logs/.\n" +
+                    "Make sure All Files Access is granted for SELinux Toolbox."
+
+                else ->
+                    "Failed to import log: ${e.message}"
+            }
+            ImportLogResult.Failure(reason)
         }
     }
 

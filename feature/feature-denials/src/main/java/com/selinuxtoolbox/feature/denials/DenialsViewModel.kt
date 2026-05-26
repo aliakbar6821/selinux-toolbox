@@ -2,6 +2,8 @@ package com.selinuxtoolbox.feature.denials
 
 import android.app.Application
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.selinuxtoolbox.core.domain.usecase.AnalyzeDenialsUseCase
@@ -101,13 +103,32 @@ class DenialsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(step = DenialsStep.Importing) }
 
-            val state = _uiState.value
+            // Guard: All Files Access required to write into /sdcard work path
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                !Environment.isExternalStorageManager()
+            ) {
+                _uiState.update {
+                    it.copy(
+                        step = DenialsStep.Error(
+                            "All Files Access not granted.\n\n" +
+                            "Settings → Special App Access → All Files Access\n" +
+                            "→ SELinux Toolbox → Allow\n\n" +
+                            "Return to the app and try again."
+                        )
+                    )
+                }
+                return@launch
+            }
+
+            val state    = _uiState.value
             val tempFile = uriToTempFile(uri) ?: run {
                 _uiState.update {
-                    it.copy(step = DenialsStep.Error(
-                        "Cannot read selected file.\n" +
-                        "Try copying the log to /sdcard/Download first, then pick it from there."
-                    ))
+                    it.copy(
+                        step = DenialsStep.Error(
+                            "Cannot read selected file.\n" +
+                            "Try copying the log to /sdcard/Download first, then pick it from there."
+                        )
+                    )
                 }
                 return@launch
             }
@@ -119,6 +140,7 @@ class DenialsViewModel @Inject constructor(
             )) {
                 is ImportLogResult.Failure ->
                     _uiState.update { it.copy(step = DenialsStep.Error(importResult.reason)) }
+
                 is ImportLogResult.Success -> {
                     _uiState.update { it.copy(step = DenialsStep.Analyzing) }
                     runAnalysis(
@@ -173,7 +195,7 @@ class DenialsViewModel @Inject constructor(
         if (group.isIntentional) return
         if (SafetyConfig.classify(group.sourceDomain) == TypeSafety.UNSAFE) return
 
-        val key = groupKey(group)
+        val key        = groupKey(group)
         val newAccepted = if (key in results.acceptedIds)
             results.acceptedIds - key
         else
@@ -218,24 +240,19 @@ class DenialsViewModel @Inject constructor(
         "${g.sourceDomain}::${g.targetType}::${g.objectClass}"
 
     /**
-     * Convert a content URI to a temp File.
-     *
-     * uri.lastPathSegment for content:// URIs can be something like
-     * "document/primary:Download/boot.log" — the slash makes File() create
-     * nested dirs instead of a single file, which then fails.
-     * We sanitize by keeping only the final path component and replacing
-     * any remaining illegal characters.
+     * Convert a content URI to a temp File in cacheDir.
+     * Sanitizes the URI segment to avoid nested-dir creation from
+     * paths like "primary:Download/boot.log".
      */
     private fun uriToTempFile(uri: Uri): File? {
         return try {
             val ctx    = getApplication<Application>()
             val stream = ctx.contentResolver.openInputStream(uri) ?: return null
 
-            // Extract safe filename from the URI
-            val rawSegment  = uri.lastPathSegment ?: "imported_log.txt"
-            val safeName    = rawSegment
-                .substringAfterLast('/')   // strip path prefix like "primary:Download/"
-                .substringAfterLast(':')   // strip storage prefix like "primary:"
+            val rawSegment = uri.lastPathSegment ?: "imported_log.txt"
+            val safeName   = rawSegment
+                .substringAfterLast('/')
+                .substringAfterLast(':')
                 .replace(Regex("[^a-zA-Z0-9._\\-]"), "_")
                 .ifBlank { "imported_log.txt" }
 
