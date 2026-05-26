@@ -38,6 +38,7 @@ class GenerateMissingContextsUseCase @Inject constructor(
             }
             val report = (comparisonResult as FullComparisonResult.Success).report
 
+            // Filter missing entries by accepted types and safety
             val missingEntries = report.missingContextEntries
                 .filter { it.type in acceptedTypes }
                 .filter { SafetyConfig.classify(it.type) != TypeSafety.UNSAFE }
