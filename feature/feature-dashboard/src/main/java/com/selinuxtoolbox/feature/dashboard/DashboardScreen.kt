@@ -157,7 +157,7 @@ fun DashboardScreen(
                     )
                 }
 
-                // Quick Actions Grid
+                // Quick Actions Grid - fixed height to prevent infinite constraints
                 item {
                     QuickActionsGrid(
                         onNavigateToDenials = onNavigateToDenials,
@@ -414,7 +414,9 @@ private fun QuickActionsGrid(
         columns = GridCells.Adaptive(minSize = 80.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(250.dp) // Fixed height prevents infinite constraints
     ) {
         items(actions, key = { it.label }) { action ->
             Card(
