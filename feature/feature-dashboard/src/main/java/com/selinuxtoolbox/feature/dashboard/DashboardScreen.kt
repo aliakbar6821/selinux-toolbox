@@ -1,54 +1,13 @@
 package com.selinuxtoolbox.feature.dashboard
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Circle
-import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.ClearAll
-import androidx.compose.material.icons.filled.CompareArrows
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Stream
-import androidx.compose.material3.Badge
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
@@ -57,6 +16,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import com.selinuxtoolbox.core.model.AvcDenial
 import com.selinuxtoolbox.core.model.Project
 import com.selinuxtoolbox.core.model.SelinuxMode
@@ -75,10 +35,23 @@ fun DashboardScreen(
     onNavigateToProjects: () -> Unit,
     onNavigateToDenials: () -> Unit,
     onNavigateToContextDiff: () -> Unit,
+    onNavigateToRcScan: () -> Unit,
+    onNavigateToAttributes: () -> Unit,
+    onNavigateToValidator: () -> Unit,
+    onNavigateToCompile: () -> Unit,
+    onNavigateToExplorer: () -> Unit,
+    onNavigateToLogImporter: () -> Unit,
+    onNavigateToCleanup: () -> Unit,
+    onNavigateToDiff: () -> Unit,
+    onNavigateToConflicts: () -> Unit,
+    onNavigateToContexts: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Drawer state
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -97,102 +70,459 @@ fun DashboardScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "SELinux Toolbox",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            NavigationDrawerContent(
+                onNavigateToProjects = onNavigateToProjects,
+                onNavigateToDenials = onNavigateToDenials,
+                onNavigateToContextDiff = onNavigateToContextDiff,
+                onNavigateToRcScan = onNavigateToRcScan,
+                onNavigateToAttributes = onNavigateToAttributes,
+                onNavigateToValidator = onNavigateToValidator,
+                onNavigateToCompile = onNavigateToCompile,
+                onNavigateToExplorer = onNavigateToExplorer,
+                onNavigateToLogImporter = onNavigateToLogImporter,
+                onNavigateToCleanup = onNavigateToCleanup,
+                onNavigateToDiff = onNavigateToDiff,
+                onNavigateToConflicts = onNavigateToConflicts,
+                onNavigateToContexts = onNavigateToContexts,
+                onCloseDrawer = { drawerState.close() }
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(
-                start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // SELinux status card
-            item {
-                SelinuxStatusCard(
-                    status = uiState.selinuxStatus,
-                    isLoading = uiState.isLoadingStatus,
-                    onToggleMode = { viewModel.toggleSelinuxMode() }
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            "SELinux Toolbox",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { if (drawerState.isClosed) drawerState.open() else drawerState.close() }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Open navigation drawer")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.refresh() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
-            }
-
-            // Active project card
-            item {
-                ActiveProjectCard(
-                    project = uiState.activeProject,
-                    onNavigateToProjects = onNavigateToProjects
-                )
-            }
-
-            // Quick actions
-            item {
-                QuickActionsRow(
-                    onNavigateToDenials = onNavigateToDenials,
-                    onNavigateToProjects = onNavigateToProjects,
-                    onNavigateToContextDiff = onNavigateToContextDiff
-                )
-            }
-
-            // Denial stream controls + list header
-            item {
-                DenialSectionHeader(
-                    isStreaming = uiState.isStreaming,
-                    streamedCount = uiState.streamedDenialCount,
-                    denialCount = uiState.recentDenials.size,
-                    isLoading = uiState.isLoadingDenials,
-                    onStartStream = { viewModel.startStreaming() },
-                    onStopStream = { viewModel.stopStreaming() },
-                    onClear = { viewModel.clearDenials() }
-                )
-            }
-
-            if (uiState.isLoadingDenials && uiState.recentDenials.isEmpty()) {
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) }
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(
+                    start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // SELinux status card
                 item {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) { CircularProgressIndicator() }
+                    SelinuxStatusCard(
+                        status = uiState.selinuxStatus,
+                        isLoading = uiState.isLoadingStatus,
+                        onToggleMode = { viewModel.toggleSelinuxMode() }
+                    )
                 }
-            } else if (uiState.recentDenials.isEmpty()) {
+
+                // Active project card
                 item {
-                    EmptyDenialsPlaceholder(isStreaming = uiState.isStreaming)
+                    ActiveProjectCard(
+                        project = uiState.activeProject,
+                        onNavigateToProjects = onNavigateToProjects
+                    )
                 }
-            } else {
-                items(
-                    items = uiState.recentDenials,
-                    key = { it.id }
-                ) { denial ->
-                    DenialRow(denial = denial)
+
+                // Quick actions row 1
+                item {
+                    QuickActionsRow1(
+                        onNavigateToDenials = onNavigateToDenials,
+                        onNavigateToContextDiff = onNavigateToContextDiff,
+                        onNavigateToCleanup = onNavigateToCleanup,
+                        onNavigateToProjects = onNavigateToProjects
+                    )
+                }
+
+                // Quick actions row 2
+                item {
+                    QuickActionsRow2(
+                        onNavigateToRcScan = onNavigateToRcScan,
+                        onNavigateToAttributes = onNavigateToAttributes,
+                        onNavigateToValidator = onNavigateToValidator,
+                        onNavigateToCompile = onNavigateToCompile
+                    )
+                }
+
+                // Quick actions row 3
+                item {
+                    QuickActionsRow3(
+                        onNavigateToExplorer = onNavigateToExplorer,
+                        onNavigateToLogImporter = onNavigateToLogImporter,
+                        onNavigateToDiff = onNavigateToDiff,
+                        onNavigateToConflicts = onNavigateToConflicts
+                    )
+                }
+
+                // Denial stream controls + list header
+                item {
+                    DenialSectionHeader(
+                        isStreaming = uiState.isStreaming,
+                        streamedCount = uiState.streamedDenialCount,
+                        denialCount = uiState.recentDenials.size,
+                        isLoading = uiState.isLoadingDenials,
+                        onStartStream = { viewModel.startStreaming() },
+                        onStopStream = { viewModel.stopStreaming() },
+                        onClear = { viewModel.clearDenials() }
+                    )
+                }
+
+                if (uiState.isLoadingDenials && uiState.recentDenials.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) { CircularProgressIndicator() }
+                    }
+                } else if (uiState.recentDenials.isEmpty()) {
+                    item {
+                        EmptyDenialsPlaceholder(isStreaming = uiState.isStreaming)
+                    }
+                } else {
+                    items(
+                        items = uiState.recentDenials,
+                        key = { it.id }
+                    ) { denial ->
+                        DenialRow(denial = denial)
+                    }
                 }
             }
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SELinux Status Card
-// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun NavigationDrawerContent(
+    onNavigateToProjects: () -> Unit,
+    onNavigateToDenials: () -> Unit,
+    onNavigateToContextDiff: () -> Unit,
+    onNavigateToRcScan: () -> Unit,
+    onNavigateToAttributes: () -> Unit,
+    onNavigateToValidator: () -> Unit,
+    onNavigateToCompile: () -> Unit,
+    onNavigateToExplorer: () -> Unit,
+    onNavigateToLogImporter: () -> Unit,
+    onNavigateToCleanup: () -> Unit,
+    onNavigateToDiff: () -> Unit,
+    onNavigateToConflicts: () -> Unit,
+    onNavigateToContexts: () -> Unit,
+    onCloseDrawer: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Text(
+                "SELinux Toolbox",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        HorizontalDivider()
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(vertical = 8.dp)
+        ) {
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Dashboard") },
+                    selected = false,
+                    onClick = { onCloseDrawer() },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Projects") },
+                    selected = false,
+                    onClick = { onNavigateToProjects(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.FolderOpen, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("RC Seclabel Scanner") },
+                    selected = false,
+                    onClick = { onNavigateToRcScan(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Context Diff & Generator") },
+                    selected = false,
+                    onClick = { onNavigateToContextDiff(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.CompareArrows, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Missing Typeattribute Fixer") },
+                    selected = false,
+                    onClick = { onNavigateToAttributes(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.Category, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Denial Analyzer") },
+                    selected = false,
+                    onClick = { onNavigateToDenials(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.BugReport, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Log Importer") },
+                    selected = false,
+                    onClick = { onNavigateToLogImporter(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.FileOpen, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Manual Type Search") },
+                    selected = false,
+                    onClick = { onNavigateToExplorer(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Policy Cleanup") },
+                    selected = false,
+                    onClick = { onNavigateToCleanup(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.CleaningServices, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Policy Diff") },
+                    selected = false,
+                    onClick = { onNavigateToDiff(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.Difference, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Conflict Detector") },
+                    selected = false,
+                    onClick = { onNavigateToConflicts(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.Warning, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Context Viewer") },
+                    selected = false,
+                    onClick = { onNavigateToContexts(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.List, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Validator") },
+                    selected = false,
+                    onClick = { onNavigateToValidator(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.Verified, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            item {
+                NavigationDrawerItem(
+                    label = { Text("Compile Policy") },
+                    selected = false,
+                    onClick = { onNavigateToCompile(); onCloseDrawer() },
+                    icon = { Icon(Icons.Default.Build, contentDescription = null) },
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionsRow1(
+    onNavigateToDenials: () -> Unit,
+    onNavigateToContextDiff: () -> Unit,
+    onNavigateToCleanup: () -> Unit,
+    onNavigateToProjects: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.BugReport,
+            label = "Analyze\nDenials",
+            onClick = onNavigateToDenials
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.CompareArrows,
+            label = "Context\nDiff",
+            onClick = onNavigateToContextDiff
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.CleaningServices,
+            label = "Cleanup\nPolicy",
+            onClick = onNavigateToCleanup
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.FolderOpen,
+            label = "Projects",
+            onClick = onNavigateToProjects
+        )
+    }
+}
+
+@Composable
+private fun QuickActionsRow2(
+    onNavigateToRcScan: () -> Unit,
+    onNavigateToAttributes: () -> Unit,
+    onNavigateToValidator: () -> Unit,
+    onNavigateToCompile: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Search,
+            label = "RC\nScanner",
+            onClick = onNavigateToRcScan
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Category,
+            label = "Attributes\nFixer",
+            onClick = onNavigateToAttributes
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Verified,
+            label = "Validator",
+            onClick = onNavigateToValidator
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Build,
+            label = "Compile\nPolicy",
+            onClick = onNavigateToCompile
+        )
+    }
+}
+
+@Composable
+private fun QuickActionsRow3(
+    onNavigateToExplorer: () -> Unit,
+    onNavigateToLogImporter: () -> Unit,
+    onNavigateToDiff: () -> Unit,
+    onNavigateToConflicts: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Search,
+            label = "Manual\nSearch",
+            onClick = onNavigateToExplorer
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.FileOpen,
+            label = "Log\nImporter",
+            onClick = onNavigateToLogImporter
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Difference,
+            label = "Policy\nDiff",
+            onClick = onNavigateToDiff
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Warning,
+            label = "Conflict\nDetector",
+            onClick = onNavigateToConflicts
+        )
+    }
+}
+
+@Composable
+private fun QuickActionCard(
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+    }
+}
+
+// ── Existing components (SelinuxStatusCard, ActiveProjectCard, etc.) remain unchanged ──
 
 @Composable
 private fun SelinuxStatusCard(
@@ -304,10 +634,6 @@ private fun DeviceInfoChip(label: String, value: String) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Active Project Card
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun ActiveProjectCard(
     project: Project?,
@@ -361,83 +687,6 @@ private fun ActiveProjectCard(
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Quick Actions
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun QuickActionsRow(
-    onNavigateToDenials: () -> Unit,
-    onNavigateToProjects: () -> Unit,
-    onNavigateToContextDiff: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.BugReport,
-            label = "Analyze\nDenials",
-            onClick = onNavigateToDenials
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.CompareArrows,
-            label = "Context\nDiff",
-            onClick = onNavigateToContextDiff
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.CleaningServices,
-            label = "Cleanup\nPolicy",
-            onClick = onNavigateToProjects
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.FolderOpen,
-            label = "Projects",
-            onClick = onNavigateToProjects
-        )
-    }
-}
-
-@Composable
-private fun QuickActionCard(
-    modifier: Modifier = Modifier,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Denial Section Header
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun DenialSectionHeader(
@@ -550,10 +799,6 @@ private fun DenialSectionHeader(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Denial Row
-// ─────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun DenialRow(denial: AvcDenial) {
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
@@ -605,10 +850,6 @@ private fun DenialRow(denial: AvcDenial) {
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Empty state
-// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun EmptyDenialsPlaceholder(isStreaming: Boolean) {
