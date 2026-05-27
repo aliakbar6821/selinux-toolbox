@@ -85,6 +85,7 @@ dependencies {
     implementation(project(":feature:feature-validator"))
     implementation(project(":feature:feature-contextdiff"))
     implementation(project(":feature:feature-attributes"))
+    implementation(project(":feature:feature-logimporter"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.compose.bom))

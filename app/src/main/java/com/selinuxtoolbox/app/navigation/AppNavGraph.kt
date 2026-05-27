@@ -22,6 +22,8 @@ import com.selinuxtoolbox.feature.denials.navigateToDenials
 import com.selinuxtoolbox.feature.diff.diffScreen
 import com.selinuxtoolbox.feature.explorer.EXPLORER_ROUTE
 import com.selinuxtoolbox.feature.explorer.explorerScreen
+import com.selinuxtoolbox.feature.logimporter.LOG_IMPORTER_ROUTE
+import com.selinuxtoolbox.feature.logimporter.logImporterScreen
 import com.selinuxtoolbox.feature.offline.rcScanScreen
 import com.selinuxtoolbox.feature.projects.navigateToProjects
 import com.selinuxtoolbox.feature.projects.projectsGraph
@@ -65,5 +67,7 @@ fun AppNavGraph() {
         contextDiffScreen()
 
         attributesScreen()
+
+        logImporterScreen()
     }
 }
