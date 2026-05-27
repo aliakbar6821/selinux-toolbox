@@ -18,12 +18,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-// ── UI State ──────────────────────────────────────────────────────────────────
 
 sealed class RcScanPhase {
     object Idle : RcScanPhase()
@@ -45,8 +44,6 @@ sealed class RcScanEvent {
     data class OutputReady(val outputDir: String) : RcScanEvent()
     data class Error(val message: String) : RcScanEvent()
 }
-
-// ── ViewModel ─────────────────────────────────────────────────────────────────
 
 @HiltViewModel
 class RcScanViewModel @Inject constructor(
