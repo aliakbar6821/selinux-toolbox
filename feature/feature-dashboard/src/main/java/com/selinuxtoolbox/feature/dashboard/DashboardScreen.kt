@@ -414,12 +414,12 @@ private fun QuickActionsGrid(
     )
 
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 105.dp),
+        columns = GridCells.Adaptive(minSize = 130.dp), // increased from 105dp
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .height(280.dp)
+            .height(330.dp) // increased from 280dp
     ) {
         items(actions, key = { it.label }) { action ->
             Card(
@@ -445,7 +445,7 @@ private fun QuickActionsGrid(
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center,
-                        lineHeight = 14.sp
+                        lineHeight = 16.sp // increased from 14sp
                     )
                 }
             }

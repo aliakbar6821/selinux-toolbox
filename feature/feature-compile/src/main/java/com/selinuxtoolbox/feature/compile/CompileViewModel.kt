@@ -11,6 +11,7 @@ import com.selinuxtoolbox.core.domain.usecase.PreCheckResult
 import com.selinuxtoolbox.core.domain.usecase.SecilcError
 import com.selinuxtoolbox.core.model.ActiveMode
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,7 +49,8 @@ data class CompileUiState(
     val mode: ActiveMode = ActiveMode.OFFLINE,
     val outputDir: String = "",          // from AppPreferences
     val mappingVersion: String = "34.0", // from project
-    val policyVersion: Int = 34
+    val policyVersion: Int = 34,
+    val initAttempts: Int = 0
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -92,30 +94,52 @@ class CompileViewModel @Inject constructor(
         }
 
         // Check binary readiness
+        checkBinaryReadiness()
+    }
+
+    private fun checkBinaryReadiness() {
         if (!binaryManager.isSecilcReady()) {
             _uiState.update { it.copy(step = CompileStep.Initializing) }
-            // Trigger binary initialization in the background
             viewModelScope.launch {
-                binaryManager.initialize()
-                _uiState.update {
-                    it.copy(
-                        step = if (binaryManager.isSecilcReady()) CompileStep.Idle else CompileStep.SetupError("Binary still not ready after init")
-                    )
+                // Try to initialize with a timeout
+                var attempts = 0
+                var success = false
+                while (attempts < 3 && !success) {
+                    attempts++
+                    _uiState.update { it.copy(initAttempts = attempts) }
+                    val result = binaryManager.initialize()
+                    if (result.isSuccess && binaryManager.isSecilcReady()) {
+                        success = true
+                        _uiState.update { 
+                            it.copy(
+                                step = CompileStep.Idle,
+                                initAttempts = 0
+                            )
+                        }
+                    } else {
+                        delay(500)
+                    }
+                }
+                if (!success) {
+                    _uiState.update {
+                        it.copy(
+                            step = CompileStep.SetupError(
+                                "Binary initialization failed after 3 attempts.\n\n" +
+                                "Please ensure:\n" +
+                                "1. ARM64 'secilc' and 'sepolicy-analyze' binaries are in app/src/main/assets/bin/\n" +
+                                "2. The binaries are executable (chmod +x)\n" +
+                                "3. The app has storage permission to write to private dir"
+                            )
+                        )
+                    }
                 }
             }
         }
     }
 
     fun retryBinaryInit() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(step = CompileStep.Initializing) }
-            binaryManager.initialize()
-            _uiState.update {
-                it.copy(
-                    step = if (binaryManager.isSecilcReady()) CompileStep.Idle else CompileStep.SetupError("Binary still not ready. Check app/src/main/assets/bin/")
-                )
-            }
-        }
+        _uiState.update { it.copy(step = CompileStep.Initializing, initAttempts = 0) }
+        checkBinaryReadiness()
     }
 
     fun setPolicyVersion(version: Int) {
@@ -124,8 +148,18 @@ class CompileViewModel @Inject constructor(
 
     fun compile() {
         val state = _uiState.value
+        if (!binaryManager.isSecilcReady()) {
+            _uiState.update {
+                it.copy(
+                    step = CompileStep.SetupError(
+                        "secilc binary not ready.\n\n" +
+                        "Tap 'Retry Binary Initialization' on the previous screen."
+                    )
+                )
+            }
+            return
+        }
         viewModelScope.launch {
-            // Phase 1 — dry-run indicator
             _uiState.update { it.copy(step = CompileStep.DryRunning) }
 
             val outputPath = "${state.outputDir}/precompiled_sepolicy"
@@ -137,7 +171,6 @@ class CompileViewModel @Inject constructor(
                 policyVersion = state.policyVersion
             )
 
-            // Phase 2 — if dry-run passed, compilePolicyUseCase switches to real compile internally
             val nextStep = when (result) {
                 is CompileResult.Success -> CompileStep.Success(
                     outputPath    = result.outputPath,
