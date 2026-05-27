@@ -100,7 +100,7 @@ class BinaryManager @Inject constructor(
             }
 
             // Open asset and get size
-            val assetSize = context.assets.openFd(assetPath).use { it.length() }
+            val assetSize = context.assets.openFd(assetPath).use { it.length }
             Log.d(TAG, "Extracting $name from assets (size: $assetSize bytes)")
 
             // Delete any existing file
