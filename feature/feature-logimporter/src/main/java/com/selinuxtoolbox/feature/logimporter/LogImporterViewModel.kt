@@ -1,7 +1,8 @@
 package com.selinuxtoolbox.feature.logimporter
 
+import android.app.Application
 import android.net.Uri
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.selinuxtoolbox.core.data.prefs.AppPreferences
 import com.selinuxtoolbox.core.domain.usecase.GetActiveProjectUseCase
@@ -42,8 +43,9 @@ sealed class LogImporterEvent {
 class LogImporterViewModel @Inject constructor(
     private val getActiveProject: GetActiveProjectUseCase,
     private val importLogUseCase: ImportLogUseCase,
-    private val appPreferences: AppPreferences
-) : ViewModel() {
+    private val appPreferences: AppPreferences,
+    application: Application
+) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(LogImporterUiState())
     val uiState: StateFlow<LogImporterUiState> = _uiState.asStateFlow()
@@ -112,7 +114,7 @@ class LogImporterViewModel @Inject constructor(
             _uiState.update { it.copy(isImporting = true, error = null) }
             try {
                 val state = _uiState.value
-                val ctx = getApplication<android.app.Application>()
+                val ctx = getApplication<Application>()
                 val stream = ctx.contentResolver.openInputStream(uri) ?: run {
                     _events.emit(LogImporterEvent.Error("Cannot open file"))
                     _uiState.update { it.copy(isImporting = false) }
@@ -147,9 +149,4 @@ class LogImporterViewModel @Inject constructor(
             }
         }
     }
-
-    private fun getApplication(): android.app.Application =
-        androidx.lifecycle.AndroidViewModel(getApplication<android.app.Application>()) {
-            // dummy call to get context
-        }.getApplication()
 }

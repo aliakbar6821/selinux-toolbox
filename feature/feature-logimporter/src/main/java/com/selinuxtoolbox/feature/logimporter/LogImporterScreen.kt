@@ -55,8 +55,7 @@ fun LogImporterScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { filePicker.launch(arrayOf("text/*", "*/*")) },
-                enabled = !uiState.isImporting
+                onClick = { filePicker.launch(arrayOf("text/*", "*/*")) }
             ) {
                 if (uiState.isImporting) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
