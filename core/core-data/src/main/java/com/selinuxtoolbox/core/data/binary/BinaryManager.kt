@@ -47,10 +47,7 @@ class BinaryManager @Inject constructor(
 ) {
 
     private val binDir: File by lazy {
-        File(context.filesDir, "bin").also { 
-            Log.d(TAG, "Binary directory: ${it.absolutePath}")
-            it.mkdirs()
-        }
+        File(context.filesDir, "bin").also { it.mkdirs() }
     }
 
     val secilcFile: File
@@ -66,13 +63,6 @@ class BinaryManager @Inject constructor(
     suspend fun initialize(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Initializing binaries in ${binDir.absolutePath}")
-            
-            // Check if directory is writable
-            if (!binDir.canWrite()) {
-                Log.e(TAG, "Cannot write to binary directory")
-                return@withContext Result.failure(Exception("Cannot write to ${binDir.absolutePath}"))
-            }
-            
             val secilcOk = extractBinary(BINARY_SECILC)
             val sepolicyOk = extractBinary(BINARY_SEPOLICY_ANALYZE)
             
@@ -80,11 +70,6 @@ class BinaryManager @Inject constructor(
                 val error = "Binary extraction failed: secilc=$secilcOk, sepolicy=$sepolicyOk"
                 Log.e(TAG, error)
                 return@withContext Result.failure(Exception(error))
-            }
-            
-            // List extracted files for debugging
-            binDir.listFiles()?.forEach { file ->
-                Log.d(TAG, "Extracted file: ${file.name} - size: ${file.length} - executable: ${file.canExecute()}")
             }
             
             // Verify the binaries actually work
@@ -108,8 +93,6 @@ class BinaryManager @Inject constructor(
         val assetPath = "$ASSETS_BIN_DIR/$name"
 
         try {
-            Log.d(TAG, "Extracting $name to ${outFile.absolutePath}")
-            
             // Check if we already have a valid binary
             if (outFile.exists() && outFile.length > 0 && outFile.canExecute()) {
                 Log.d(TAG, "$name already exists and is executable, skipping extraction")
@@ -118,7 +101,7 @@ class BinaryManager @Inject constructor(
 
             // Open asset and get size
             val assetSize = context.assets.openFd(assetPath).use { it.length() }
-            Log.d(TAG, "Asset $name size: $assetSize bytes")
+            Log.d(TAG, "Extracting $name from assets (size: $assetSize bytes)")
 
             // Delete any existing file
             if (outFile.exists()) {
@@ -145,12 +128,6 @@ class BinaryManager @Inject constructor(
                 return@withContext false
             }
 
-            // Verify permissions
-            if (!outFile.canExecute()) {
-                Log.e(TAG, "$name is not executable even after setExecutable(true)")
-                return@withContext false
-            }
-
             Log.d(TAG, "$name extracted successfully (${outFile.length} bytes)")
             return@withContext true
 
@@ -166,26 +143,13 @@ class BinaryManager @Inject constructor(
             return@withContext false
         }
         try {
-            // Try without root first
-            val result = runCatching {
-                Runtime.getRuntime().exec(arrayOf(file.absolutePath, "--version"))
-            }.fold(
-                onSuccess = { process ->
-                    val output = process.inputStream.bufferedReader().readText()
-                    process.waitFor()
-                    output
-                },
-                onFailure = { 
-                    // Fall back to root shell
-                    rootShell.execute("${file.absolutePath} --version 2>&1 || true").output
-                }
-            )
-            
-            if (result.contains("secilc") || result.contains("sepolicy-analyze") || result.isNotBlank()) {
+            val result = rootShell.execute("${file.absolutePath} --version 2>&1 || true")
+            val output = (result.stdout + result.stderr).joinToString("\n")
+            if (output.contains("secilc") || output.contains("sepolicy-analyze") || output.trim().isNotEmpty()) {
                 Log.d(TAG, "$name verification passed")
                 return@withContext true
             } else {
-                Log.e(TAG, "$name verification failed: output was '$result'")
+                Log.e(TAG, "$name verification failed: output was '$output'")
                 return@withContext false
             }
         } catch (e: Exception) {
