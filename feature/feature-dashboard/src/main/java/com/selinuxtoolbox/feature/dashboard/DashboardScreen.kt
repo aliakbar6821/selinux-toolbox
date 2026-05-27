@@ -16,7 +16,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import kotlinx.coroutines.launch
 import com.selinuxtoolbox.core.model.AvcDenial
 import com.selinuxtoolbox.core.model.Project
 import com.selinuxtoolbox.core.model.SelinuxMode
@@ -52,6 +52,7 @@ fun DashboardScreen(
 
     // Drawer state
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -87,7 +88,7 @@ fun DashboardScreen(
                 onNavigateToDiff = onNavigateToDiff,
                 onNavigateToConflicts = onNavigateToConflicts,
                 onNavigateToContexts = onNavigateToContexts,
-                onCloseDrawer = { drawerState.close() }
+                onCloseDrawer = { scope.launch { drawerState.close() } }
             )
         }
     ) {
@@ -102,7 +103,14 @@ fun DashboardScreen(
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = { if (drawerState.isClosed) drawerState.open() else drawerState.close() }) {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    if (drawerState.isClosed) drawerState.open()
+                                    else drawerState.close()
+                                }
+                            }
+                        ) {
                             Icon(Icons.Default.Menu, contentDescription = "Open navigation drawer")
                         }
                     },
@@ -251,7 +259,7 @@ private fun NavigationDrawerContent(
                 NavigationDrawerItem(
                     label = { Text("Dashboard") },
                     selected = false,
-                    onClick = { onCloseDrawer() },
+                    onClick = onCloseDrawer,
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
             }
@@ -376,153 +384,7 @@ private fun NavigationDrawerContent(
     }
 }
 
-@Composable
-private fun QuickActionsRow1(
-    onNavigateToDenials: () -> Unit,
-    onNavigateToContextDiff: () -> Unit,
-    onNavigateToCleanup: () -> Unit,
-    onNavigateToProjects: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.BugReport,
-            label = "Analyze\nDenials",
-            onClick = onNavigateToDenials
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.CompareArrows,
-            label = "Context\nDiff",
-            onClick = onNavigateToContextDiff
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.CleaningServices,
-            label = "Cleanup\nPolicy",
-            onClick = onNavigateToCleanup
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.FolderOpen,
-            label = "Projects",
-            onClick = onNavigateToProjects
-        )
-    }
-}
-
-@Composable
-private fun QuickActionsRow2(
-    onNavigateToRcScan: () -> Unit,
-    onNavigateToAttributes: () -> Unit,
-    onNavigateToValidator: () -> Unit,
-    onNavigateToCompile: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.Search,
-            label = "RC\nScanner",
-            onClick = onNavigateToRcScan
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.Category,
-            label = "Attributes\nFixer",
-            onClick = onNavigateToAttributes
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.Verified,
-            label = "Validator",
-            onClick = onNavigateToValidator
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.Build,
-            label = "Compile\nPolicy",
-            onClick = onNavigateToCompile
-        )
-    }
-}
-
-@Composable
-private fun QuickActionsRow3(
-    onNavigateToExplorer: () -> Unit,
-    onNavigateToLogImporter: () -> Unit,
-    onNavigateToDiff: () -> Unit,
-    onNavigateToConflicts: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.Search,
-            label = "Manual\nSearch",
-            onClick = onNavigateToExplorer
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.FileOpen,
-            label = "Log\nImporter",
-            onClick = onNavigateToLogImporter
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.Difference,
-            label = "Policy\nDiff",
-            onClick = onNavigateToDiff
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.Warning,
-            label = "Conflict\nDetector",
-            onClick = onNavigateToConflicts
-        )
-    }
-}
-
-@Composable
-private fun QuickActionCard(
-    modifier: Modifier = Modifier,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
-    }
-}
-
-// ── Existing components (SelinuxStatusCard, ActiveProjectCard, etc.) remain unchanged ──
+// ── Existing components (SelinuxStatusCard, ActiveProjectCard, QuickActionCard, etc.) remain unchanged ──
 
 @Composable
 private fun SelinuxStatusCard(
@@ -684,6 +546,152 @@ private fun ActiveProjectCard(
             FilledTonalButton(onClick = onNavigateToProjects) {
                 Text(if (project != null) "Switch" else "Open")
             }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionsRow1(
+    onNavigateToDenials: () -> Unit,
+    onNavigateToContextDiff: () -> Unit,
+    onNavigateToCleanup: () -> Unit,
+    onNavigateToProjects: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.BugReport,
+            label = "Analyze\nDenials",
+            onClick = onNavigateToDenials
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.CompareArrows,
+            label = "Context\nDiff",
+            onClick = onNavigateToContextDiff
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.CleaningServices,
+            label = "Cleanup\nPolicy",
+            onClick = onNavigateToCleanup
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.FolderOpen,
+            label = "Projects",
+            onClick = onNavigateToProjects
+        )
+    }
+}
+
+@Composable
+private fun QuickActionsRow2(
+    onNavigateToRcScan: () -> Unit,
+    onNavigateToAttributes: () -> Unit,
+    onNavigateToValidator: () -> Unit,
+    onNavigateToCompile: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Search,
+            label = "RC\nScanner",
+            onClick = onNavigateToRcScan
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Category,
+            label = "Attributes\nFixer",
+            onClick = onNavigateToAttributes
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Verified,
+            label = "Validator",
+            onClick = onNavigateToValidator
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Build,
+            label = "Compile\nPolicy",
+            onClick = onNavigateToCompile
+        )
+    }
+}
+
+@Composable
+private fun QuickActionsRow3(
+    onNavigateToExplorer: () -> Unit,
+    onNavigateToLogImporter: () -> Unit,
+    onNavigateToDiff: () -> Unit,
+    onNavigateToConflicts: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Search,
+            label = "Manual\nSearch",
+            onClick = onNavigateToExplorer
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.FileOpen,
+            label = "Log\nImporter",
+            onClick = onNavigateToLogImporter
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Difference,
+            label = "Policy\nDiff",
+            onClick = onNavigateToDiff
+        )
+        QuickActionCard(
+            modifier = Modifier.weight(1f),
+            icon = Icons.Default.Warning,
+            label = "Conflict\nDetector",
+            onClick = onNavigateToConflicts
+        )
+    }
+}
+
+@Composable
+private fun QuickActionCard(
+    modifier: Modifier = Modifier,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
         }
     }
 }
