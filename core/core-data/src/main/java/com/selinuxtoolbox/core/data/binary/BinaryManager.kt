@@ -94,13 +94,13 @@ class BinaryManager @Inject constructor(
 
         try {
             // Check if we already have a valid binary
-            if (outFile.exists() && outFile.length > 0 && outFile.canExecute()) {
+            if (outFile.exists() && outFile.length() > 0 && outFile.canExecute()) {
                 Log.d(TAG, "$name already exists and is executable, skipping extraction")
                 return@withContext true
             }
 
             // Open asset and get size
-            val assetSize = context.assets.openFd(assetPath).use { it.length }
+            val assetSize = context.assets.openFd(assetPath).use { it.getLength() }
             Log.d(TAG, "Extracting $name from assets (size: $assetSize bytes)")
 
             // Delete any existing file
@@ -116,8 +116,8 @@ class BinaryManager @Inject constructor(
             }
 
             // Check size
-            if (!outFile.exists() || outFile.length != assetSize) {
-                val size = if (outFile.exists()) outFile.length else 0
+            if (!outFile.exists() || outFile.length() != assetSize) {
+                val size = if (outFile.exists()) outFile.length() else 0
                 Log.e(TAG, "$name extraction failed: expected $assetSize bytes, got $size bytes")
                 return@withContext false
             }
@@ -128,7 +128,7 @@ class BinaryManager @Inject constructor(
                 return@withContext false
             }
 
-            Log.d(TAG, "$name extracted successfully (${outFile.length} bytes)")
+            Log.d(TAG, "$name extracted successfully (${outFile.length()} bytes)")
             return@withContext true
 
         } catch (e: Exception) {
@@ -192,8 +192,8 @@ class BinaryManager @Inject constructor(
         }
     }
 
-    fun isSecilcReady(): Boolean = secilcFile.exists() && secilcFile.canExecute() && secilcFile.length > 0
-    fun isSepolicyAnalyzeReady(): Boolean = sepolicyAnalyzeFile.exists() && sepolicyAnalyzeFile.canExecute() && sepolicyAnalyzeFile.length > 0
+    fun isSecilcReady(): Boolean = secilcFile.exists() && secilcFile.canExecute() && secilcFile.length() > 0
+    fun isSepolicyAnalyzeReady(): Boolean = sepolicyAnalyzeFile.exists() && sepolicyAnalyzeFile.canExecute() && sepolicyAnalyzeFile.length() > 0
 
     // -------------------------------------------------------------------------
     // secilc operations
