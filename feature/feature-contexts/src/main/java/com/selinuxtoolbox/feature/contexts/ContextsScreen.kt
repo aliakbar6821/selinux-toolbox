@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,8 +23,8 @@ import com.selinuxtoolbox.core.model.Partition
 import com.selinuxtoolbox.core.ui.components.SearchBar
 import com.selinuxtoolbox.core.ui.theme.ReviewBlue
 import com.selinuxtoolbox.core.ui.theme.EnforcingGreen
-import com.selinuxtoolbox.core.ui.theme.CriticalRed
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContextsScreen(
     viewModel: ContextsViewModel = hiltViewModel()
@@ -192,7 +194,7 @@ fun ContextsScreen(
                 ) {
                     CircularProgressIndicator()
                 }
-            } else if (uiState.oemEntries.isEmpty() && uiState.aospEntries.isEmpty()) {
+            } else if (uiState.oemEntries.isEmpty() && uiState.aospEntries.isEmpty() && uiState.commonEntries.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
