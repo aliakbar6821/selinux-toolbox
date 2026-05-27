@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -280,7 +282,7 @@ private fun NavigationDrawerContent(
                     label = { Text("Context Diff & Generator") },
                     selected = false,
                     onClick = { onNavigateToContextDiff(); onCloseDrawer() },
-                    icon = { Icon(Icons.Default.CompareArrows, contentDescription = null) },
+                    icon = { Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null) },
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
             }
@@ -352,7 +354,7 @@ private fun NavigationDrawerContent(
                     label = { Text("Context Viewer") },
                     selected = false,
                     onClick = { onNavigateToContexts(); onCloseDrawer() },
-                    icon = { Icon(Icons.Default.List, contentDescription = null) },
+                    icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
                     modifier = Modifier.padding(horizontal = 12.dp)
                 )
             }
@@ -398,7 +400,7 @@ private fun QuickActionsGrid(
 
     val actions = listOf(
         QuickAction(Icons.Default.BugReport, "Analyze Denials", onNavigateToDenials),
-        QuickAction(Icons.Default.CompareArrows, "Context Diff", onNavigateToContextDiff),
+        QuickAction(Icons.AutoMirrored.Filled.CompareArrows, "Context Diff", onNavigateToContextDiff),
         QuickAction(Icons.Default.CleaningServices, "Cleanup Policy", onNavigateToCleanup),
         QuickAction(Icons.Default.FolderOpen, "Projects", onNavigateToProjects),
         QuickAction(Icons.Default.Search, "RC Scanner", onNavigateToRcScan),

@@ -76,7 +76,7 @@ class CompileViewModel @Inject constructor(
         }
 
         val mappingVersion = project.mappingVersion
-        val defaultVersion = runCatching { mappingVersion.substringBefore('.').toInt() }.getOrElse(34)
+        val defaultVersion = runCatching { mappingVersion.substringBefore('.').toInt() }.getOrElse { 34 }
 
         _uiState.update {
             it.copy(

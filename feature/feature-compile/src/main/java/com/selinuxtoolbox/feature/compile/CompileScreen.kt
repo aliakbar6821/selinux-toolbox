@@ -89,7 +89,7 @@ private fun IdleContent(
     var showVersionPicker by remember { mutableStateOf(false) }
 
     // Generate versions dynamically based on mapping version
-    val baseVersion = runCatching { mappingVersion.substringBefore('.').toInt() }.getOrElse(35)
+    val baseVersion = runCatching { mappingVersion.substringBefore('.').toInt() }.getOrElse { 35 }
     val versions = (baseVersion - 5..baseVersion + 2).filter { it >= 30 }.sorted()
 
     LazyColumn(
