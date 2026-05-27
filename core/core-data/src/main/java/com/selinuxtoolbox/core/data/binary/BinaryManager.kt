@@ -149,7 +149,7 @@ class BinaryManager @Inject constructor(
                 Log.d(TAG, "$name verification passed")
                 return@withContext true
             } else {
-                Log.e(TAG, "$name verification failed: output was ")
+                Log.e(TAG, "$name verification failed: output was '$output'")
                 return@withContext false
             }
         } catch (e: Exception) {
@@ -231,8 +231,8 @@ class BinaryManager @Inject constructor(
         policyVersion: Int
     ): String {
         val binary = secilcFile.absolutePath
-        val fileArgs = cilFiles.joinToString(" ") { "" }
-        return "$binary -o  -f  -c $policyVersion $fileArgs 2>&1"
+        val fileArgs = cilFiles.joinToString(" ") { "'$it'" }
+        return "$binary -o '$outputPath' -f '$fcPath' -c $policyVersion $fileArgs 2>&1"
     }
 
     // -------------------------------------------------------------------------
@@ -243,7 +243,7 @@ class BinaryManager @Inject constructor(
         if (!isSepolicyAnalyzeReady()) {
             return@withContext BinaryResult.BinaryNotReady(BINARY_SEPOLICY_ANALYZE)
         }
-        val cmd = "${sepolicyAnalyzeFile.absolutePath}  print types 2>&1"
+        val cmd = "${sepolicyAnalyzeFile.absolutePath} '$compiledPolicyPath' print types 2>&1"
         executeAndReturn(cmd)
     }
 
@@ -251,7 +251,7 @@ class BinaryManager @Inject constructor(
         if (!isSepolicyAnalyzeReady()) {
             return@withContext BinaryResult.BinaryNotReady(BINARY_SEPOLICY_ANALYZE)
         }
-        val cmd = "${sepolicyAnalyzeFile.absolutePath}  allow -s  2>&1"
+        val cmd = "${sepolicyAnalyzeFile.absolutePath} '$compiledPolicyPath' allow -s '$typeName' 2>&1"
         executeAndReturn(cmd)
     }
 
@@ -259,7 +259,7 @@ class BinaryManager @Inject constructor(
         if (!isSepolicyAnalyzeReady()) {
             return@withContext BinaryResult.BinaryNotReady(BINARY_SEPOLICY_ANALYZE)
         }
-        val cmd = "${sepolicyAnalyzeFile.absolutePath}  neverallow 2>&1"
+        val cmd = "${sepolicyAnalyzeFile.absolutePath} '$compiledPolicyPath' neverallow 2>&1"
         executeAndReturn(cmd)
     }
 
