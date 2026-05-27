@@ -2,6 +2,7 @@ package com.selinuxtoolbox.feature.compile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.selinuxtoolbox.core.data.binary.BinaryManager
 import com.selinuxtoolbox.core.data.prefs.AppPreferences
 import com.selinuxtoolbox.core.domain.usecase.CompileResult
 import com.selinuxtoolbox.core.domain.usecase.CompilePolicyUseCase
@@ -21,10 +22,11 @@ import javax.inject.Inject
 // ── UI state ──────────────────────────────────────────────────────────────────
 
 sealed class CompileStep {
-    object NoProject   : CompileStep()
-    object Idle        : CompileStep()
-    object DryRunning  : CompileStep()
-    object Compiling   : CompileStep()
+    object NoProject    : CompileStep()
+    object Initializing : CompileStep()
+    object Idle         : CompileStep()
+    object DryRunning   : CompileStep()
+    object Compiling    : CompileStep()
     data class Success(
         val outputPath: String,
         val sizeKb: Long,
@@ -39,13 +41,14 @@ sealed class CompileStep {
 }
 
 data class CompileUiState(
-    val step: CompileStep  = CompileStep.NoProject,
+    val step: CompileStep = CompileStep.Initializing,
     val projectName: String = "",
-    val aospPath: String    = "",
-    val workPath: String    = "",
-    val mode: ActiveMode    = ActiveMode.OFFLINE,
-    val outputDir: String   = "",          // from AppPreferences
-    val policyVersion: Int  = 31
+    val aospPath: String = "",
+    val workPath: String = "",
+    val mode: ActiveMode = ActiveMode.OFFLINE,
+    val outputDir: String = "",          // from AppPreferences
+    val mappingVersion: String = "34.0", // from project
+    val policyVersion: Int = 34
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -54,6 +57,7 @@ data class CompileUiState(
 class CompileViewModel @Inject constructor(
     private val getActiveProject: GetActiveProjectUseCase,
     private val compilePolicyUseCase: CompilePolicyUseCase,
+    private val binaryManager: BinaryManager,
     private val appPreferences: AppPreferences
 ) : ViewModel() {
 
@@ -70,15 +74,47 @@ class CompileViewModel @Inject constructor(
             _uiState.update { it.copy(step = CompileStep.NoProject, outputDir = outputDir) }
             return
         }
+
+        val mappingVersion = project.mappingVersion
+        val defaultVersion = runCatching { mappingVersion.substringBefore('.').toInt() }.getOrElse(34)
+
         _uiState.update {
             it.copy(
-                step        = CompileStep.Idle,
-                projectName = project.name,
-                aospPath    = project.aospPath.ifEmpty { project.projectFolderPath },
-                workPath    = project.workPath.ifEmpty { project.projectFolderPath },
-                mode        = project.activeMode,
-                outputDir   = outputDir
+                step           = CompileStep.Idle,
+                projectName    = project.name,
+                aospPath       = project.aospPath.ifEmpty { project.projectFolderPath },
+                workPath       = project.workPath.ifEmpty { project.projectFolderPath },
+                mode           = project.activeMode,
+                outputDir      = outputDir,
+                mappingVersion = mappingVersion,
+                policyVersion  = defaultVersion
             )
+        }
+
+        // Check binary readiness
+        if (!binaryManager.isSecilcReady()) {
+            _uiState.update { it.copy(step = CompileStep.Initializing) }
+            // Trigger binary initialization in the background
+            viewModelScope.launch {
+                binaryManager.initialize()
+                _uiState.update {
+                    it.copy(
+                        step = if (binaryManager.isSecilcReady()) CompileStep.Idle else CompileStep.SetupError("Binary still not ready after init")
+                    )
+                }
+            }
+        }
+    }
+
+    fun retryBinaryInit() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(step = CompileStep.Initializing) }
+            binaryManager.initialize()
+            _uiState.update {
+                it.copy(
+                    step = if (binaryManager.isSecilcReady()) CompileStep.Idle else CompileStep.SetupError("Binary still not ready. Check app/src/main/assets/bin/")
+                )
+            }
         }
     }
 
@@ -102,8 +138,6 @@ class CompileViewModel @Inject constructor(
             )
 
             // Phase 2 — if dry-run passed, compilePolicyUseCase switches to real compile internally
-            // Update step to Compiling briefly before result arrives (use case is sequential,
-            // so we skip the intermediate update — just map result to final step)
             val nextStep = when (result) {
                 is CompileResult.Success -> CompileStep.Success(
                     outputPath    = result.outputPath,

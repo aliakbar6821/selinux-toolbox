@@ -4,9 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,13 +38,18 @@ fun CompileScreen(
                 is CompileStep.NoProject ->
                     CenteredMessage("No active project. Create or open a project first.")
 
+                is CompileStep.Initializing ->
+                    CenteredLoading("Initializing secilc binary…")
+
                 is CompileStep.Idle ->
                     IdleContent(
-                        projectName   = uiState.projectName,
-                        outputDir     = uiState.outputDir,
-                        policyVersion = uiState.policyVersion,
+                        projectName    = uiState.projectName,
+                        outputDir      = uiState.outputDir,
+                        mappingVersion = uiState.mappingVersion,
+                        policyVersion  = uiState.policyVersion,
                         onVersionChange = viewModel::setPolicyVersion,
-                        onCompile     = viewModel::compile
+                        onCompile      = viewModel::compile,
+                        onRetryBinary  = viewModel::retryBinaryInit
                     )
 
                 is CompileStep.DryRunning ->
@@ -77,12 +80,17 @@ fun CompileScreen(
 private fun IdleContent(
     projectName: String,
     outputDir: String,
+    mappingVersion: String,
     policyVersion: Int,
     onVersionChange: (Int) -> Unit,
-    onCompile: () -> Unit
+    onCompile: () -> Unit,
+    onRetryBinary: () -> Unit
 ) {
     var showVersionPicker by remember { mutableStateOf(false) }
-    val versions = listOf(30, 31, 32, 33, 34, 35)
+
+    // Generate versions dynamically based on mapping version
+    val baseVersion = runCatching { mappingVersion.substringBefore('.').toInt() }.getOrElse(35)
+    val versions = (baseVersion - 5..baseVersion + 2).filter { it >= 30 }.sorted()
 
     LazyColumn(
         modifier       = Modifier.fillMaxSize().padding(20.dp),
@@ -166,6 +174,15 @@ private fun IdleContent(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = onRetryBinary,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Retry Binary Initialization")
+                    }
                 }
             }
         }

@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
@@ -157,7 +158,7 @@ fun DashboardScreen(
                     )
                 }
 
-                // Quick Actions Grid - fixed height to prevent infinite constraints
+                // Quick Actions Grid
                 item {
                     QuickActionsGrid(
                         onNavigateToDenials = onNavigateToDenials,
@@ -411,12 +412,12 @@ private fun QuickActionsGrid(
     )
 
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 80.dp),
+        columns = GridCells.Adaptive(minSize = 105.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .height(250.dp) // Fixed height prevents infinite constraints
+            .height(280.dp)
     ) {
         items(actions, key = { it.label }) { action ->
             Card(
@@ -429,27 +430,26 @@ private fun QuickActionsGrid(
                         .fillMaxWidth()
                         .padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
                         imageVector = action.icon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                     Text(
                         text = action.label,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        lineHeight = 14.sp
                     )
                 }
             }
         }
     }
 }
-
-// ── Existing components (SelinuxStatusCard, ActiveProjectCard, etc.) remain unchanged ──
 
 @Composable
 private fun SelinuxStatusCard(
